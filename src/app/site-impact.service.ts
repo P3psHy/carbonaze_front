@@ -2,56 +2,38 @@ import { Injectable } from '@angular/core';
 import { Observable, of } from 'rxjs';
 
 import {
+  ConfiguredMaterial,
   ImpactCategory,
-  MaterialFactorDefinition,
-  MaterialFactorMap,
   MaterialImpact,
   SiteImpactResult,
   SiteInputPayload,
 } from './site-impact.models';
 
-export const MATERIAL_FACTOR_DEFINITIONS: MaterialFactorDefinition[] = [
+export const DEFAULT_CONFIGURED_MATERIALS: ConfiguredMaterial[] = [
   {
-    key: 'beton',
-    label: 'Béton',
-    helper: 'Tous les bétons et variantes bas carbone',
-    defaultFactor: 0.18,
-    aliases: ['beton'],
+    id: 'beton',
+    name: 'Béton',
+    factor: 0.18,
   },
   {
-    key: 'acier',
-    label: 'Acier',
-    helper: 'Structures et composants acier',
-    defaultFactor: 1.9,
-    aliases: ['acier', 'steel'],
+    id: 'acier',
+    name: 'Acier',
+    factor: 1.9,
   },
   {
-    key: 'verre',
-    label: 'Verre',
-    helper: 'Façades, vitrages et cloisons',
-    defaultFactor: 1.05,
-    aliases: ['verre', 'glass', 'vitrage'],
+    id: 'verre',
+    name: 'Verre',
+    factor: 1.05,
   },
   {
-    key: 'bois',
-    label: 'Bois',
-    helper: 'Bois massif, CLT et dérivés',
-    defaultFactor: 0.08,
-    aliases: ['bois', 'wood'],
+    id: 'bois',
+    name: 'Bois',
+    factor: 0.08,
   },
   {
-    key: 'aluminium',
-    label: 'Aluminium',
-    helper: 'Profils, façades et menuiseries',
-    defaultFactor: 8.2,
-    aliases: ['aluminium', 'alu'],
-  },
-  {
-    key: 'default',
-    label: 'Autres',
-    helper: 'Facteur appliqué si aucun matériau connu ne correspond',
-    defaultFactor: 0.35,
-    aliases: [],
+    id: 'aluminium',
+    name: 'Aluminium',
+    factor: 8.2,
   },
 ];
 
@@ -59,10 +41,10 @@ export const MATERIAL_FACTOR_DEFINITIONS: MaterialFactorDefinition[] = [
 export class SiteImpactService {
   calculateImpact(
     payload: SiteInputPayload,
-    materialFactors?: Partial<MaterialFactorMap>,
+    configuredMaterials?: ConfiguredMaterial[],
   ): Observable<SiteImpactResult> {
-    const normalizedFactors = this.normalizeMaterialFactors(materialFactors);
-    const materialImpacts = this.buildMaterialImpacts(payload.materials, normalizedFactors);
+    const normalizedMaterials = this.normalizeConfiguredMaterials(configuredMaterials);
+    const materialImpacts = this.buildMaterialImpacts(payload.materials, normalizedMaterials);
     const materialsEmission = this.sum(materialImpacts.map((material) => material.emission));
     const energyEmission = payload.energyMwh * 0.055;
     const gasEmission = payload.gasMwh * 0.227;
@@ -102,51 +84,82 @@ export class SiteImpactService {
     });
   }
 
-  getDefaultMaterialFactors(): MaterialFactorMap {
-    return MATERIAL_FACTOR_DEFINITIONS.reduce(
-      (factors, definition) => ({
-        ...factors,
-        [definition.key]: definition.defaultFactor,
-      }),
-      {} as MaterialFactorMap,
-    );
+  getDefaultConfiguredMaterials(): ConfiguredMaterial[] {
+    return DEFAULT_CONFIGURED_MATERIALS.map((material) => ({ ...material }));
   }
 
-  normalizeMaterialFactors(materialFactors?: Partial<MaterialFactorMap>): MaterialFactorMap {
-    const defaults = this.getDefaultMaterialFactors();
+  normalizeConfiguredMaterials(
+    configuredMaterials?: ConfiguredMaterial[],
+    options?: {
+      fallbackToDefaults?: boolean;
+    },
+  ): ConfiguredMaterial[] {
+    const fallbackToDefaults = options?.fallbackToDefaults ?? true;
 
-    for (const definition of MATERIAL_FACTOR_DEFINITIONS) {
-      const value = materialFactors?.[definition.key];
-
-      if (typeof value === 'number' && Number.isFinite(value) && value > 0) {
-        defaults[definition.key] = this.round(value, 2);
-      }
+    if (!Array.isArray(configuredMaterials)) {
+      return this.getDefaultConfiguredMaterials();
     }
 
-    return defaults;
+    const normalizedMaterials = configuredMaterials.reduce<ConfiguredMaterial[]>((materials, material, index) => {
+      const normalizedName = material?.name?.trim();
+      const normalizedFactor = material?.factor;
+
+      if (
+        !normalizedName ||
+        typeof normalizedFactor !== 'number' ||
+        !Number.isFinite(normalizedFactor) ||
+        normalizedFactor <= 0
+      ) {
+        return materials;
+      }
+
+      materials.push({
+        id: this.normalizeMaterialId(material?.id, index),
+        backendId:
+          typeof material?.backendId === 'number' && Number.isFinite(material.backendId)
+            ? material.backendId
+            : undefined,
+        name: normalizedName,
+        factor: this.round(normalizedFactor, 2),
+      });
+
+      return materials;
+    }, []);
+
+    return normalizedMaterials.length > 0 || !fallbackToDefaults
+      ? normalizedMaterials
+      : this.getDefaultConfiguredMaterials();
   }
 
   private buildMaterialImpacts(
     materials: SiteInputPayload['materials'],
-    materialFactors: MaterialFactorMap,
+    configuredMaterials: ConfiguredMaterial[],
   ): MaterialImpact[] {
     const palette = ['#14532d', '#0f766e', '#ca8a04', '#b45309', '#7c2d12', '#155e75'];
+    const materialsById = new Map(configuredMaterials.map((material) => [material.id, material]));
 
     return materials
-      .filter((material) => material.name.trim() && material.quantity > 0)
+      .filter((material) => material.quantity > 0)
       .map((material, index) => {
-        const factor = this.resolveMaterialFactor(material.name, materialFactors);
-        const emission = this.round(material.quantity * factor);
+        const configuredMaterial =
+          materialsById.get(material.materialId) ?? this.findMaterialByName(material.name, configuredMaterials);
+
+        if (!configuredMaterial) {
+          return null;
+        }
+
+        const emission = this.round(material.quantity * configuredMaterial.factor);
 
         return {
-          name: material.name.trim(),
+          name: configuredMaterial.name,
           quantity: material.quantity,
-          factor,
+          factor: configuredMaterial.factor,
           emission,
           share: 0,
           color: palette[index % palette.length],
         };
-      });
+      })
+      .filter((material): material is MaterialImpact => material !== null);
   }
 
   private buildCategories(values: {
@@ -216,17 +229,24 @@ export class SiteImpactService {
       topMaterial
         ? `${topMaterial.name} est le matériau le plus impactant avec ${topMaterial.emission} tCO2e estimées.`
         : "Ajoutez des matériaux pour enrichir l'analyse construction.",
-      `${payload.parkingSpaces} places et ${payload.computers} postes informatiques alimentent deja les stats de pilotage.`,
+      `${payload.parkingSpaces} places et ${payload.computers} postes informatiques alimentent déjà les stats de pilotage.`,
     ];
   }
 
-  private resolveMaterialFactor(name: string, materialFactors: MaterialFactorMap): number {
-    const key = name.trim().toLowerCase();
-    const definition = MATERIAL_FACTOR_DEFINITIONS.find(
-      (item) => item.key !== 'default' && item.aliases.some((alias) => key.includes(alias)),
-    );
+  private findMaterialByName(name: string, configuredMaterials: ConfiguredMaterial[]): ConfiguredMaterial | undefined {
+    const normalizedName = name.trim().toLowerCase();
 
-    return materialFactors[definition?.key ?? 'default'];
+    return configuredMaterials.find((material) => material.name.trim().toLowerCase() === normalizedName);
+  }
+
+  private normalizeMaterialId(id: string | undefined, index: number): string {
+    const normalizedId = id?.trim();
+
+    if (normalizedId) {
+      return normalizedId;
+    }
+
+    return `material-${index + 1}`;
   }
 
   private sum(values: number[]): number {

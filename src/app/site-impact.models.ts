@@ -1,18 +1,14 @@
 export interface SiteMaterialInput {
+  materialId: string;
   name: string;
   quantity: number;
 }
 
-export type MaterialFactorKey = 'beton' | 'acier' | 'verre' | 'bois' | 'aluminium' | 'default';
-
-export type MaterialFactorMap = Record<MaterialFactorKey, number>;
-
-export interface MaterialFactorDefinition {
-  key: MaterialFactorKey;
-  label: string;
-  helper: string;
-  defaultFactor: number;
-  aliases: string[];
+export interface ConfiguredMaterial {
+  id: string;
+  backendId?: number;
+  name: string;
+  factor: number;
 }
 
 export interface SiteInputPayload {

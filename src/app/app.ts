@@ -1,5 +1,6 @@
-import { Component } from '@angular/core';
-import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
+import { ViewportScroller } from '@angular/common';
+import { Component, inject } from '@angular/core';
+import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 
 import { CalculatorSettingsButtonComponent } from './calculator-settings-button.component';
 
@@ -9,4 +10,13 @@ import { CalculatorSettingsButtonComponent } from './calculator-settings-button.
   templateUrl: './app.html',
   styleUrl: './app.css',
 })
-export class App {}
+export class App {
+  private readonly router = inject(Router);
+  private readonly viewportScroller = inject(ViewportScroller);
+
+  goToHome(): void {
+    void this.router.navigateByUrl('/').then(() => {
+      this.viewportScroller.scrollToPosition([0, 0]);
+    });
+  }
+}

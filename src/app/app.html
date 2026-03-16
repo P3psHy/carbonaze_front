@@ -2,7 +2,12 @@
   <div class="page-frame app-topbar-frame">
     <div class="topbar panel rounded-[30px] px-5 py-4 sm:px-6">
       <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-        <div class="flex items-center gap-4">
+        <button
+          type="button"
+          class="brand-home-button flex items-center gap-4 text-left"
+          (click)="goToHome()"
+          aria-label="Retourner a l'accueil Carbonaze"
+        >
           <div class="brand-mark" aria-hidden="true">
             <span></span>
             <span></span>
@@ -13,7 +18,7 @@
             <p class="font-heading text-xl font-semibold tracking-[-0.03em] text-[var(--ink)]">Carbonaze</p>
             <p class="text-sm text-[var(--muted)]">Plateforme de calcul et d'analyse des émissions CO2</p>
           </div>
-        </div>
+        </button>
 
         <div class="flex flex-col gap-3 sm:flex-row sm:items-center">
           <nav class="hidden items-center gap-2 rounded-full bg-white/60 p-1 text-sm text-[var(--muted)] md:flex">

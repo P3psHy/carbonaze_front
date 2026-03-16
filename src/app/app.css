@@ -3,6 +3,15 @@
   min-height: 100vh;
 }
 
+.brand-home-button {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
 .app-topbar-shell {
   position: fixed;
   inset: 0 0 auto;

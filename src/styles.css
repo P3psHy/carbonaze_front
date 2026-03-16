@@ -367,6 +367,84 @@ body.modal-open {
   box-shadow: 0 0 0 4px rgba(196, 66, 40, 0.08);
 }
 
+.number-input-shell {
+  position: relative;
+}
+
+.number-input-shell .field-input {
+  padding-right: 4.7rem;
+}
+
+.number-input-shell-error .field-input {
+  border-color: rgba(196, 66, 40, 0.5);
+  box-shadow: 0 0 0 4px rgba(196, 66, 40, 0.08);
+}
+
+.number-input {
+  appearance: textfield;
+  -moz-appearance: textfield;
+}
+
+.number-input::-webkit-inner-spin-button,
+.number-input::-webkit-outer-spin-button {
+  appearance: none;
+  margin: 0;
+}
+
+.number-stepper {
+  position: absolute;
+  top: 0.2rem;
+  right: 0.2rem;
+  bottom: 0.2rem;
+  width: 4rem;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-radius: 1rem;
+  border: 1px solid rgba(20, 51, 45, 0.08);
+  background: linear-gradient(180deg, rgba(244, 240, 229, 0.96), rgba(237, 231, 217, 0.98));
+}
+
+.number-stepper-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  flex: 1 1 50%;
+  min-height: 0;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--ink);
+  font-family: var(--font-heading);
+  font-size: 1.25rem;
+  line-height: 1;
+  font-weight: 700;
+  cursor: pointer;
+  transition:
+    background-color 180ms ease,
+    color 180ms ease,
+    transform 180ms ease;
+}
+
+.number-stepper-button-increment {
+  border-bottom: 1px solid rgba(20, 51, 45, 0.08);
+}
+
+.number-stepper-button:hover {
+  background: rgba(19, 92, 82, 0.1);
+}
+
+.number-stepper-button:active {
+  background: rgba(19, 92, 82, 0.16);
+  transform: scale(0.98);
+}
+
+.number-stepper-button:focus-visible {
+  outline: none;
+  background: rgba(19, 92, 82, 0.14);
+}
+
 .material-row {
   transition:
     transform 180ms ease,
@@ -576,55 +654,8 @@ body.modal-open {
   padding: 0 1.5rem 1.5rem;
 }
 
-.settings-modal-body {
-  overflow: hidden;
-  max-height: none;
-  padding-bottom: 1.25rem;
-}
-
 .settings-modal-heading {
   max-width: 42rem;
-}
-
-.settings-panel {
-  padding-block: 1rem;
-}
-
-.settings-field-grid {
-  display: grid;
-  gap: 0.9rem;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-}
-
-.settings-field-shell {
-  gap: 0.5rem;
-}
-
-.settings-field-shell .field-input {
-  min-height: 3.7rem;
-  padding: 0.95rem 1.15rem;
-  padding-right: 1.45rem;
-  font-size: 1.02rem;
-  line-height: 1.4;
-}
-
-.settings-field-shell .field-input[type='number'] {
-  padding-right: 1.8rem;
-}
-
-.settings-field-shell .field-input[type='number']::-webkit-inner-spin-button,
-.settings-field-shell .field-input[type='number']::-webkit-outer-spin-button {
-  min-height: 2.1rem;
-  opacity: 1;
-}
-
-.settings-field-shell .field-helper {
-  font-size: 0.82rem;
-  line-height: 1.35rem;
-}
-
-.settings-actions {
-  margin-top: 0.25rem;
 }
 
 .orb {
@@ -707,15 +738,6 @@ body.modal-open {
     overflow: auto;
   }
 
-  .settings-modal-body {
-    overflow: visible;
-    padding: 0 1rem 1rem;
-  }
-
-  .settings-field-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
   .floating-settings-button {
     right: 1rem;
     bottom: 1rem;
@@ -732,10 +754,12 @@ body.modal-open {
     bottom: 1rem;
     padding: 0.82rem 1rem;
   }
-}
 
-@media (max-width: 767px) {
-  .settings-field-grid {
-    grid-template-columns: 1fr;
+  .number-input-shell .field-input {
+    padding-right: 4.35rem;
+  }
+
+  .number-stepper {
+    width: 3.7rem;
   }
 }
