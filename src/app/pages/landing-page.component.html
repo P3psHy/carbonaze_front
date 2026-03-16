@@ -1,0 +1,162 @@
+<div class="page-shell min-h-screen overflow-hidden">
+  <div class="orb orb-left" aria-hidden="true"></div>
+  <div class="orb orb-right" aria-hidden="true"></div>
+
+  <main class="page-frame">
+    <section class="grid gap-6 xl:grid-cols-[1.08fr_0.92fr]">
+      <article class="panel hero-panel rounded-[34px] p-6 sm:p-8 lg:p-10">
+        <p class="eyebrow">Pilotage carbone multi-sites</p>
+        <h1
+          class="font-heading mt-4 max-w-[12ch] text-4xl font-semibold tracking-[-0.05em] text-[var(--ink)] sm:text-5xl lg:text-[4.8rem] lg:leading-[0.95]"
+        >
+          Centralisez vos données site et lancez un calcul carbone lisible en quelques minutes.
+        </h1>
+        <p class="hero-copy mt-6 max-w-[760px] text-base leading-8 text-[var(--muted)] sm:text-lg">
+          Carbonaze rassemble les consommations, l'exploitation et l'inventaire matériaux d'un site pour produire une
+          lecture immédiate des émissions. La page calculs est ensuite entièrement dédiée à la saisie et à la
+          restitution.
+        </p>
+
+        <div class="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center">
+          <a
+            class="inline-flex items-center justify-center rounded-full bg-[var(--moss)] px-5 py-3 text-sm font-semibold text-white shadow-[0_18px_40px_rgba(19,92,82,0.18)] transition hover:-translate-y-0.5 hover:bg-[#104a42]"
+            [routerLink]="['/calculs']"
+          >
+            Ouvrir le calculateur
+          </a>
+          <a
+            class="inline-flex items-center justify-center rounded-full border border-[var(--line-strong)] bg-white/70 px-5 py-3 text-sm font-semibold text-[var(--ink)] transition hover:-translate-y-0.5 hover:bg-white"
+            href="#calculator-overview"
+          >
+            Voir ce que mesure Carbonaze
+          </a>
+        </div>
+
+        <div class="mt-10 grid gap-3 sm:grid-cols-3">
+          <article class="summary-chip">
+            <span>Données d'entrée</span>
+            <strong>Site, énergie, gaz, effectifs, parking, IT et inventaire matériaux</strong>
+          </article>
+          <article class="summary-chip">
+            <span>Saisie guidée</span>
+            <strong>Une modal unique pour renseigner ou corriger toutes les valeurs</strong>
+          </article>
+          <article class="summary-chip">
+            <span>Restitution</span>
+            <strong>KPIs, répartition, inventaire détaillé et points d'attention automatiques</strong>
+          </article>
+        </div>
+      </article>
+
+      <aside class="panel hero-aside rounded-[34px] p-6 sm:p-8">
+        <div class="space-y-6">
+          <div>
+            <p class="eyebrow">Le calculateur en pratique</p>
+            <h2 class="font-heading mt-3 text-3xl font-semibold tracking-[-0.04em] text-[var(--ink)]">
+              Tout ce qu'il faut comprendre avant d'aller sur la page calculs.
+            </h2>
+          </div>
+
+          <article class="panel-soft rounded-[28px] p-5">
+            <p class="text-sm uppercase tracking-[0.2em] text-[var(--muted)]">Parcours</p>
+            <div class="mt-4 space-y-3 text-sm leading-7 text-[var(--ink)]">
+              <p class="flex items-start gap-3">
+                <span class="mt-2 inline-block h-2 w-2 rounded-full bg-[var(--moss)]"></span>
+                <span>Renseignez les données d'un site dans une modal de saisie unique.</span>
+              </p>
+              <p class="flex items-start gap-3">
+                <span class="mt-2 inline-block h-2 w-2 rounded-full bg-[var(--moss)]"></span>
+                <span>Obtenez une synthèse immédiate avec total estimé, ratio par employé et catégorie dominante.</span>
+              </p>
+              <p class="flex items-start gap-3">
+                <span class="mt-2 inline-block h-2 w-2 rounded-full bg-[var(--moss)]"></span>
+                <span>Revenez dans la modal à tout moment pour comparer plusieurs hypothèses.</span>
+              </p>
+            </div>
+          </article>
+
+          <article class="brand-card rounded-[28px] p-5">
+            <p class="text-xs uppercase tracking-[0.22em] text-white/60">Accès direct</p>
+            <p class="mt-3 font-heading text-2xl tracking-[-0.04em] text-white">
+              La page calculs sert maintenant à calculer, pas à réexpliquer le produit.
+            </p>
+            <p class="mt-4 text-sm leading-7 text-white/80">
+              Toute la présentation du calculateur est ici sur l'accueil. Ensuite, vous basculez vers un écran plus
+              compact, centré sur la saisie et les résultats.
+            </p>
+            <a
+              class="mt-5 inline-flex items-center justify-center rounded-full bg-white px-5 py-3 text-sm font-semibold text-[var(--ink)] transition hover:-translate-y-0.5 hover:bg-[rgba(255,255,255,0.92)]"
+              [routerLink]="['/calculs']"
+            >
+              Aller à la page calculs
+            </a>
+          </article>
+        </div>
+      </aside>
+    </section>
+
+    <section class="grid gap-6 pt-8 xl:grid-cols-[1.02fr_0.98fr]" id="calculator-overview">
+      <article class="panel rounded-[34px] p-6 sm:p-8">
+        <p class="eyebrow">Ce que le calcul prend en compte</p>
+        <h2 class="font-heading mt-3 text-3xl font-semibold tracking-[-0.04em] text-[var(--ink)]">
+          Un même écran pour lire l'exploitation et la construction.
+        </h2>
+
+        <div class="mt-8 grid gap-4">
+          <article class="panel-soft rounded-[28px] p-5">
+            <p class="text-sm uppercase tracking-[0.2em] text-[var(--muted)]">Énergie et usage</p>
+            <p class="mt-3 text-base leading-8 text-[var(--ink)]">
+              Consommation électrique, gaz, taille du site, effectifs, parking et parc informatique alimentent la vue
+              d'exploitation.
+            </p>
+          </article>
+
+          <article class="panel-soft rounded-[28px] p-5">
+            <p class="text-sm uppercase tracking-[0.2em] text-[var(--muted)]">Inventaire matériaux</p>
+            <p class="mt-3 text-base leading-8 text-[var(--ink)]">
+              Chaque ligne matériau est quantifiée et valorisée avec les facteurs du calculateur pour intégrer la part
+              construction.
+            </p>
+          </article>
+
+          <article class="panel-soft rounded-[28px] p-5">
+            <p class="text-sm uppercase tracking-[0.2em] text-[var(--muted)]">Restitution actionnable</p>
+            <p class="mt-3 text-base leading-8 text-[var(--ink)]">
+              Le calcul affiche les KPIs, la répartition par catégorie, les matériaux les plus émissifs et des
+              commentaires automatiques pour prioriser.
+            </p>
+          </article>
+        </div>
+      </article>
+
+      <aside class="panel rounded-[34px] p-6 sm:p-8">
+        <p class="eyebrow">Ce que vous retrouvez sur /calculs</p>
+        <h2 class="font-heading mt-3 text-3xl font-semibold tracking-[-0.04em] text-[var(--ink)]">
+          Un espace plus compact pour calculer sans répétition.
+        </h2>
+
+        <div class="mt-6 grid gap-3">
+          <article class="summary-chip">
+            <span>Vue immédiate</span>
+            <strong>Site actif, statut du calcul et accès direct à la modal</strong>
+          </article>
+          <article class="summary-chip">
+            <span>Paramètres actifs</span>
+            <strong>Les valeurs retenues et les facteurs matériaux restent visibles</strong>
+          </article>
+          <article class="summary-chip">
+            <span>Analyse détaillée</span>
+            <strong>Graphiques, top matériaux, indicateurs site et commentaires automatiques</strong>
+          </article>
+        </div>
+
+        <a
+          class="mt-8 inline-flex items-center justify-center rounded-full bg-[var(--moss)] px-5 py-3 text-sm font-semibold text-white shadow-[0_18px_40px_rgba(19,92,82,0.18)] transition hover:-translate-y-0.5 hover:bg-[#104a42]"
+          [routerLink]="['/calculs']"
+        >
+          Lancer un calcul
+        </a>
+      </aside>
+    </section>
+  </main>
+</div>

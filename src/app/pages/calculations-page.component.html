@@ -1,0 +1,748 @@
+<div class="page-shell min-h-screen overflow-hidden">
+  <div class="orb orb-left" aria-hidden="true"></div>
+  <div class="orb orb-right" aria-hidden="true"></div>
+
+  <main class="page-frame">
+    @if (result(); as result) {
+      <section class="pb-8">
+        <article class="panel rounded-[34px] p-6 sm:p-8">
+          <div class="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
+            <div class="min-w-0">
+              <p class="eyebrow">Synthèse immédiate</p>
+              <h1 class="font-heading mt-3 text-3xl font-semibold tracking-[-0.04em] text-[var(--ink)] sm:text-4xl">
+                {{ result.siteName }}
+              </h1>
+              <p class="mt-2 text-base text-[var(--muted)]">{{ result.city }}</p>
+            </div>
+
+            <div class="flex flex-col gap-3 sm:flex-row">
+              <button
+                class="inline-flex items-center justify-center rounded-full bg-[var(--ink)] px-4 py-3 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-[#102a25] disabled:cursor-not-allowed disabled:opacity-60"
+                type="button"
+                [disabled]="isSavingCalculation()"
+                (click)="saveCurrentCalculation()"
+              >
+                {{ isSavingCalculation() ? 'Sauvegarde...' : 'Sauvegarder le calcul' }}
+              </button>
+
+              <button
+                class="inline-flex items-center justify-center rounded-full border border-[var(--line-strong)] bg-white px-4 py-3 text-sm font-semibold text-[var(--ink)] transition hover:-translate-y-0.5 hover:bg-[rgba(20,51,45,0.05)]"
+                type="button"
+                (click)="openInputModal()"
+              >
+                Modifier les données
+              </button>
+
+              <a
+                class="inline-flex items-center justify-center rounded-full border border-[var(--line-strong)] bg-white/70 px-4 py-3 text-sm font-semibold text-[var(--ink)] transition hover:-translate-y-0.5 hover:bg-white"
+                href="#results"
+              >
+                Voir l'analyse détaillée
+              </a>
+            </div>
+          </div>
+
+          <div class="mt-8 grid gap-3 sm:grid-cols-3">
+            <article class="panel-soft rounded-[28px] p-5">
+              <p class="text-sm uppercase tracking-[0.2em] text-[var(--muted)]">Émission totale estimée</p>
+              <p class="font-heading mt-3 text-4xl font-semibold tracking-[-0.05em] text-[var(--ink)]">
+                {{ result.totalEmission | number:'1.0-1' }}
+                <span class="text-xl text-[var(--muted)]">tCO2e</span>
+              </p>
+              <p class="mt-3 text-sm leading-7 text-[var(--moss)]">
+                {{ result.dominantCategory }} est actuellement le premier poste analysé.
+              </p>
+            </article>
+
+            <article class="summary-chip">
+              <span>Par employé</span>
+              <strong>{{ result.emissionPerEmployee | number:'1.0-2' }} tCO2e</strong>
+            </article>
+
+            <article class="summary-chip">
+              <span>Inventaire</span>
+              <strong>{{ result.materialCount }} matériaux suivis</strong>
+            </article>
+          </div>
+
+          @if (saveFeedback(); as feedback) {
+            <p class="mt-4 text-sm leading-7" [style.color]="feedback.kind === 'success' ? 'var(--moss)' : '#9a3412'">
+              {{ feedback.message }}
+            </p>
+          }
+        </article>
+      </section>
+    }
+
+    <section id="active-inputs">
+      <article class="panel rounded-[34px] p-6 sm:p-8">
+        <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <p class="eyebrow">Paramètres actifs</p>
+            <h2 class="font-heading mt-3 text-3xl font-semibold tracking-[-0.04em] text-[var(--ink)]">
+              Valeurs actuellement prises en compte
+            </h2>
+          </div>
+
+          <button
+            class="inline-flex items-center justify-center rounded-full border border-[var(--line-strong)] bg-white px-4 py-3 text-sm font-semibold text-[var(--ink)] transition hover:-translate-y-0.5 hover:bg-[rgba(20,51,45,0.05)]"
+            type="button"
+            (click)="openInputModal()"
+          >
+            Modifier les valeurs
+          </button>
+        </div>
+
+        <div class="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <article class="summary-chip">
+            <span>Électricité</span>
+            <strong>{{ siteForm.controls.energyMwh.value | number:'1.0-1' }} MWh/an</strong>
+          </article>
+          <article class="summary-chip">
+            <span>Gaz</span>
+            <strong>{{ siteForm.controls.gasMwh.value | number:'1.0-1' }} MWh/an</strong>
+          </article>
+          <article class="summary-chip">
+            <span>Employés</span>
+            <strong>{{ siteForm.controls.employees.value }}</strong>
+          </article>
+          <article class="summary-chip">
+            <span>Parking</span>
+            <strong>{{ siteForm.controls.parkingSpaces.value }} places</strong>
+          </article>
+          <article class="summary-chip">
+            <span>IT</span>
+            <strong>{{ siteForm.controls.computers.value }} ordinateurs</strong>
+          </article>
+          <article class="summary-chip">
+            <span>Matériaux</span>
+            <strong>{{ materials.length }} lignes dans l'inventaire</strong>
+          </article>
+        </div>
+
+          <div class="mt-6 border-t border-[rgba(20,51,45,0.08)] pt-6">
+          <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <p class="eyebrow">Facteurs matériaux</p>
+              <h3 class="font-heading mt-3 text-2xl font-semibold tracking-[-0.03em] text-[var(--ink)]">
+                Poids d'emission actifs dans le calcul
+              </h3>
+              <p class="mt-3 max-w-[700px] text-sm leading-7 text-[var(--muted)]">
+                Ajustez les coefficients front pour refléter votre référentiel. Les nouveaux poids sont réutilisés au
+                prochain calcul, ou immédiatement si une analyse existe déjà.
+              </p>
+              <button
+                class="mt-4 inline-flex items-center justify-center rounded-full border border-[var(--line-strong)] bg-white px-4 py-3 text-sm font-semibold text-[var(--ink)] transition hover:-translate-y-0.5 hover:bg-[rgba(20,51,45,0.05)]"
+                type="button"
+                (click)="openCalculatorSettings()"
+              >
+                Ouvrir le catalogue de matériaux
+              </button>
+            </div>
+          </div>
+
+          <div class="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+            @for (material of materialFactorCards(); track material.id) {
+              <article class="summary-chip">
+                <span>{{ material.name }}</span>
+                <strong>{{ material.factor | number:'1.0-2' }} tCO2e / unité</strong>
+                <p class="text-sm leading-7 text-[var(--muted)]">Valeur active appliquée à ce matériau.</p>
+              </article>
+            }
+          </div>
+        </div>
+      </article>
+    </section>
+
+    @if (result(); as result) {
+      <section class="space-y-6 pt-8" id="results" data-testid="results-panel">
+        <div class="panel rounded-[34px] p-6 sm:p-8">
+          <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div>
+              <p class="eyebrow">Analyse détaillée</p>
+              <h2 class="font-heading mt-3 text-3xl font-semibold tracking-[-0.04em] text-[var(--ink)]">
+                Tableau de bord émissions
+              </h2>
+            </div>
+
+            <button
+              class="inline-flex items-center justify-center rounded-full border border-[var(--line-strong)] bg-white px-4 py-3 text-sm font-semibold text-[var(--ink)] transition hover:-translate-y-0.5 hover:bg-[rgba(20,51,45,0.05)]"
+              type="button"
+              (click)="openInputModal()"
+            >
+              Modifier les données du site
+            </button>
+          </div>
+        </div>
+
+        <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <article class="panel stat-card rounded-[28px] p-5">
+            <span class="stat-label">Émission totale</span>
+            <strong class="stat-value">{{ result.totalEmission | number:'1.0-1' }} tCO2e</strong>
+            <p class="stat-helper">Vue consolidée du site à partir des données renseignées.</p>
+          </article>
+
+          <article class="panel stat-card rounded-[28px] p-5">
+            <span class="stat-label">Intensité par employé</span>
+            <strong class="stat-value">{{ result.emissionPerEmployee | number:'1.0-2' }} tCO2e</strong>
+            <p class="stat-helper">Indicateur utile pour comparer plusieurs implantations.</p>
+          </article>
+
+          <article class="panel stat-card rounded-[28px] p-5">
+            <span class="stat-label">Catégorie dominante</span>
+            <strong class="stat-value">{{ result.dominantCategory }}</strong>
+            <p class="stat-helper">{{ result.dominantShare | number:'1.0-1' }}% du total estimé.</p>
+          </article>
+
+          <article class="panel stat-card rounded-[28px] p-5">
+            <span class="stat-label">Matériaux suivis</span>
+            <strong class="stat-value">{{ result.materialCount }}</strong>
+            <p class="stat-helper">Inventaire construction intégré à l'analyse.</p>
+          </article>
+        </div>
+
+        <div class="grid gap-6 xl:grid-cols-[0.94fr_1.06fr]">
+          <article class="panel rounded-[34px] p-6 sm:p-8">
+            <p class="eyebrow">Répartition</p>
+            <h3 class="font-heading mt-3 text-2xl font-semibold tracking-[-0.03em] text-[var(--ink)]">
+              Contribution de chaque poste
+            </h3>
+
+            <div class="mt-8 grid gap-6 lg:grid-cols-[240px_1fr] lg:items-center">
+              <div class="flex justify-center">
+                <div class="donut-shell">
+                  <div class="donut-chart" [style.background]="donutGradient()"></div>
+                </div>
+              </div>
+
+              <div class="space-y-3">
+                @for (category of result.categories; track category.key) {
+                  <article class="legend-card">
+                    <div class="flex items-center gap-3">
+                      <span class="legend-dot" [style.background]="category.color"></span>
+                      <div>
+                        <p class="text-sm font-semibold text-[var(--ink)]">{{ category.label }}</p>
+                        <p class="text-sm text-[var(--muted)]">{{ category.helper }}</p>
+                      </div>
+                    </div>
+
+                    <div class="text-right">
+                      <p class="text-sm font-semibold text-[var(--ink)]">{{ category.emission | number:'1.0-1' }} tCO2e</p>
+                      <p class="text-sm text-[var(--muted)]">{{ category.percentage | number:'1.0-1' }}%</p>
+                    </div>
+                  </article>
+                }
+              </div>
+            </div>
+          </article>
+
+          <article class="panel rounded-[34px] p-6 sm:p-8">
+            <p class="eyebrow">Comparatif interne</p>
+            <h3 class="font-heading mt-3 text-2xl font-semibold tracking-[-0.03em] text-[var(--ink)]">
+              Niveau d'émission par catégorie
+            </h3>
+
+            <div class="mt-8 grid grid-cols-5 gap-4">
+              @for (category of categoryChart(); track category.key) {
+                <div class="flex flex-col items-center gap-4">
+                  <div class="bar-rail">
+                    <div class="bar-fill" [style.background]="category.color" [style.height.%]="category.height"></div>
+                  </div>
+                  <div class="text-center">
+                    <p class="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--ink)]">{{ category.label }}</p>
+                    <p class="mt-1 text-sm text-[var(--muted)]">{{ category.emission | number:'1.0-1' }}</p>
+                  </div>
+                </div>
+              }
+
+            </div>
+          </article>
+        </div>
+
+        <div class="grid gap-6 xl:grid-cols-[1.02fr_0.98fr]">
+          <article class="panel rounded-[34px] p-6 sm:p-8">
+            <div class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+              <div>
+                <p class="eyebrow">Matériaux</p>
+                <h3 class="font-heading mt-3 text-2xl font-semibold tracking-[-0.03em] text-[var(--ink)]">
+                  Contribution détaillée de l'inventaire
+                </h3>
+              </div>
+
+              <p class="max-w-[340px] text-sm leading-7 text-[var(--muted)]">
+                Les lignes les plus émissives ressortent immédiatement pour prioriser les actions de réduction.
+              </p>
+            </div>
+
+            <div class="mt-6 space-y-3">
+              @for (material of topMaterials(); track material.name) {
+                <article class="material-impact-card">
+                  <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                    <div class="min-w-0">
+                      <div class="flex items-center gap-3">
+                        <span class="legend-dot" [style.background]="material.color"></span>
+                        <h4 class="truncate text-base font-semibold text-[var(--ink)]">{{ material.name }}</h4>
+                      </div>
+                      <p class="mt-2 text-sm leading-7 text-[var(--muted)]">
+                        Quantité {{ material.quantity | number:'1.0-1' }} x facteur {{ material.factor | number:'1.0-2' }}
+                      </p>
+                    </div>
+
+                    <div class="text-left lg:text-right">
+                      <p class="text-base font-semibold text-[var(--ink)]">{{ material.emission | number:'1.0-1' }} tCO2e</p>
+                      <p class="mt-1 text-sm text-[var(--muted)]">{{ material.share | number:'1.0-1' }}% du total</p>
+                    </div>
+                  </div>
+
+                  <div class="mt-4 h-2.5 rounded-full bg-[rgba(20,51,45,0.08)]">
+                    <div class="h-full rounded-full" [style.background]="material.color" [style.width.%]="material.share"></div>
+                  </div>
+                </article>
+              }
+            </div>
+          </article>
+
+          <div class="grid gap-6">
+            <article class="panel rounded-[34px] p-6 sm:p-8">
+              <p class="eyebrow">Indicateurs site</p>
+              <h3 class="font-heading mt-3 text-2xl font-semibold tracking-[-0.03em] text-[var(--ink)]">
+                Résumé des données saisies
+              </h3>
+
+              <div class="mt-6 grid gap-3 sm:grid-cols-2">
+                <article class="summary-chip">
+                  <span>Ville</span>
+                  <strong>{{ result.city }}</strong>
+                </article>
+                <article class="summary-chip">
+                  <span>Employés</span>
+                  <strong>{{ siteForm.controls.employees.value }}</strong>
+                </article>
+                <article class="summary-chip">
+                  <span>Parking</span>
+                  <strong>{{ siteForm.controls.parkingSpaces.value }}</strong>
+                </article>
+                <article class="summary-chip">
+                  <span>Ordinateurs</span>
+                  <strong>{{ siteForm.controls.computers.value }}</strong>
+                </article>
+              </div>
+            </article>
+
+            <article class="panel rounded-[34px] p-6 sm:p-8">
+              <p class="eyebrow">Commentaires automatiques</p>
+              <h3 class="font-heading mt-3 text-2xl font-semibold tracking-[-0.03em] text-[var(--ink)]">
+                Points d'attention
+              </h3>
+
+              <div class="mt-6 space-y-3">
+                @for (insight of result.insights; track insight) {
+                  <article class="rounded-[22px] border border-[rgba(20,51,45,0.08)] bg-white/72 p-4 text-sm leading-7 text-[var(--ink)]">
+                    {{ insight }}
+                  </article>
+                }
+              </div>
+            </article>
+          </div>
+        </div>
+      </section>
+    } @else {
+      <section class="panel mt-8 rounded-[34px] p-6 sm:p-8" id="results">
+        <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <p class="eyebrow">Restitution</p>
+            <h2 class="font-heading mt-3 text-3xl font-semibold tracking-[-0.04em] text-[var(--ink)]">
+              L'analyse détaillée apparaîtra ici après le premier calcul.
+            </h2>
+            <p class="mt-4 max-w-[760px] text-base leading-8 text-[var(--muted)]">
+              Carbonaze générera automatiquement les indicateurs, la répartition des émissions, l'inventaire matériaux
+              et les observations associées à votre site.
+            </p>
+          </div>
+
+          <button
+            class="inline-flex items-center justify-center rounded-full bg-[var(--moss)] px-5 py-3 text-sm font-semibold text-white shadow-[0_18px_40px_rgba(19,92,82,0.18)] transition hover:-translate-y-0.5 hover:bg-[#104a42]"
+            type="button"
+            (click)="openInputModal()"
+          >
+            Lancer un premier calcul
+          </button>
+        </div>
+      </section>
+    }
+  </main>
+
+  <button
+    class="floating-input-button"
+    type="button"
+    (click)="openInputModal()"
+    aria-label="Ouvrir la modal de saisie"
+    title="Ouvrir la modal de saisie"
+  >
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path
+        d="M3 17.3V21h3.7l10.9-10.9-3.7-3.7L3 17.3Zm17.7-10.2a1 1 0 0 0 0-1.4l-2.4-2.4a1 1 0 0 0-1.4 0l-1.9 1.9 3.7 3.7 2-2Z"
+      />
+    </svg>
+    <span>Ouvrir la saisie</span>
+  </button>
+
+  @if (isInputModalOpen()) {
+    <div class="modal-backdrop" (click)="closeInputModal()">
+      <div
+        class="modal-dialog panel"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="site-input-modal-title"
+        (click)="$event.stopPropagation()"
+      >
+        <div class="modal-header">
+          <div>
+            <p class="eyebrow">Saisie des valeurs</p>
+            <h2
+              class="font-heading mt-3 text-3xl font-semibold tracking-[-0.04em] text-[var(--ink)]"
+              id="site-input-modal-title"
+            >
+              Renseigner les données d'analyse
+            </h2>
+            <p class="mt-3 max-w-[680px] text-sm leading-7 text-[var(--muted)]">
+        Insérez les valeurs de votre site pour procéder au calcul.
+            </p>
+          </div>
+
+          <div class="flex items-center gap-3">
+            <button
+              class="modal-gear-button"
+              type="button"
+              (click)="openCalculatorSettings()"
+              aria-label="Ouvrir les paramètres du calculateur"
+              title="Paramètres du calculateur"
+            >
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path
+                  d="M10.3 2.8a1 1 0 0 1 1-.8h1.4a1 1 0 0 1 1 .8l.3 1.7a7.8 7.8 0 0 1 1.7.7l1.5-.8a1 1 0 0 1 1.2.2l1 1a1 1 0 0 1 .2 1.2l-.8 1.5c.3.5.5 1.1.7 1.7l1.7.3a1 1 0 0 1 .8 1v1.4a1 1 0 0 1-.8 1l-1.7.3a7.8 7.8 0 0 1-.7 1.7l.8 1.5a1 1 0 0 1-.2 1.2l-1 1a1 1 0 0 1-1.2.2l-1.5-.8a7.8 7.8 0 0 1-1.7.7l-.3 1.7a1 1 0 0 1-1 .8h-1.4a1 1 0 0 1-1-.8l-.3-1.7a7.8 7.8 0 0 1-1.7-.7l-1.5.8a1 1 0 0 1-1.2-.2l-1-1a1 1 0 0 1-.2-1.2l.8-1.5a7.8 7.8 0 0 1-.7-1.7L2.8 13.7a1 1 0 0 1-.8-1v-1.4a1 1 0 0 1 .8-1l1.7-.3c.1-.6.4-1.2.7-1.7l-.8-1.5a1 1 0 0 1 .2-1.2l1-1a1 1 0 0 1 1.2-.2l1.5.8c.5-.3 1.1-.5 1.7-.7l.3-1.7ZM12 15.4a3.4 3.4 0 1 0 0-6.8 3.4 3.4 0 0 0 0 6.8Z"
+                />
+              </svg>
+            </button>
+
+            <button class="modal-close" type="button" (click)="closeInputModal()" aria-label="Fermer la modal">
+              Fermer
+            </button>
+          </div>
+        </div>
+
+        <form [formGroup]="siteForm" (ngSubmit)="calculate()" class="modal-body mt-6 space-y-8" data-testid="site-form">
+          @if (submitAttempted() && siteForm.invalid) {
+            <div class="rounded-[22px] border border-[rgba(196,66,40,0.2)] bg-[rgba(196,66,40,0.08)] px-4 py-3 text-sm text-[var(--ink)]">
+              Complétez les champs requis avant de lancer le calcul.
+            </div>
+          }
+
+          <div class="grid gap-4 md:grid-cols-2">
+            <label class="field-shell">
+              <span class="field-label">Nom du site</span>
+              <input
+                class="field-input"
+                formControlName="siteName"
+                type="text"
+                [class.field-input-error]="hasError(siteForm.controls.siteName)"
+              >
+            </label>
+
+            <label class="field-shell">
+              <span class="field-label">Ville</span>
+              <input
+                class="field-input"
+                formControlName="city"
+                type="text"
+                [class.field-input-error]="hasError(siteForm.controls.city)"
+              >
+            </label>
+
+            <label class="field-shell">
+              <span class="field-label">Consommation électrique (MWh/an)</span>
+              <div class="number-input-shell" [class.number-input-shell-error]="hasError(siteForm.controls.energyMwh)">
+                <input
+                  class="field-input number-input"
+                  formControlName="energyMwh"
+                  type="number"
+                  step="0.1"
+                  min="0"
+                  [class.field-input-error]="hasError(siteForm.controls.energyMwh)"
+                >
+                <div class="number-stepper">
+                  <button
+                    class="number-stepper-button number-stepper-button-increment"
+                    type="button"
+                    (click)="stepControl(siteForm.controls.energyMwh, 0.1, 0)"
+                    aria-label="Augmenter la consommation électrique"
+                  >
+                    +
+                  </button>
+                  <button
+                    class="number-stepper-button"
+                    type="button"
+                    (click)="stepControl(siteForm.controls.energyMwh, -0.1, 0)"
+                    aria-label="Diminuer la consommation électrique"
+                  >
+                    -
+                  </button>
+                </div>
+              </div>
+            </label>
+
+            <label class="field-shell">
+              <span class="field-label">Consommation de gaz (MWh/an)</span>
+              <div class="number-input-shell" [class.number-input-shell-error]="hasError(siteForm.controls.gasMwh)">
+                <input
+                  class="field-input number-input"
+                  formControlName="gasMwh"
+                  type="number"
+                  step="0.1"
+                  min="0"
+                  [class.field-input-error]="hasError(siteForm.controls.gasMwh)"
+                >
+                <div class="number-stepper">
+                  <button
+                    class="number-stepper-button number-stepper-button-increment"
+                    type="button"
+                    (click)="stepControl(siteForm.controls.gasMwh, 0.1, 0)"
+                    aria-label="Augmenter la consommation de gaz"
+                  >
+                    +
+                  </button>
+                  <button
+                    class="number-stepper-button"
+                    type="button"
+                    (click)="stepControl(siteForm.controls.gasMwh, -0.1, 0)"
+                    aria-label="Diminuer la consommation de gaz"
+                  >
+                    -
+                  </button>
+                </div>
+              </div>
+            </label>
+
+            <label class="field-shell">
+              <span class="field-label">Nombre d'employés</span>
+              <div class="number-input-shell" [class.number-input-shell-error]="hasError(siteForm.controls.employees)">
+                <input
+                  class="field-input number-input"
+                  formControlName="employees"
+                  type="number"
+                  min="1"
+                  [class.field-input-error]="hasError(siteForm.controls.employees)"
+                >
+                <div class="number-stepper">
+                  <button
+                    class="number-stepper-button number-stepper-button-increment"
+                    type="button"
+                    (click)="stepControl(siteForm.controls.employees, 1, 1)"
+                    aria-label="Augmenter le nombre d'employés"
+                  >
+                    +
+                  </button>
+                  <button
+                    class="number-stepper-button"
+                    type="button"
+                    (click)="stepControl(siteForm.controls.employees, -1, 1)"
+                    aria-label="Diminuer le nombre d'employés"
+                  >
+                    -
+                  </button>
+                </div>
+              </div>
+            </label>
+
+            <label class="field-shell">
+              <span class="field-label">Places de parking</span>
+              <div class="number-input-shell" [class.number-input-shell-error]="hasError(siteForm.controls.parkingSpaces)">
+                <input
+                  class="field-input number-input"
+                  formControlName="parkingSpaces"
+                  type="number"
+                  min="0"
+                  [class.field-input-error]="hasError(siteForm.controls.parkingSpaces)"
+                >
+                <div class="number-stepper">
+                  <button
+                    class="number-stepper-button number-stepper-button-increment"
+                    type="button"
+                    (click)="stepControl(siteForm.controls.parkingSpaces, 1, 0)"
+                    aria-label="Augmenter le nombre de places de parking"
+                  >
+                    +
+                  </button>
+                  <button
+                    class="number-stepper-button"
+                    type="button"
+                    (click)="stepControl(siteForm.controls.parkingSpaces, -1, 0)"
+                    aria-label="Diminuer le nombre de places de parking"
+                  >
+                    -
+                  </button>
+                </div>
+              </div>
+            </label>
+
+            <label class="field-shell md:col-span-2">
+              <span class="field-label">Nombre d'ordinateurs</span>
+              <div class="number-input-shell" [class.number-input-shell-error]="hasError(siteForm.controls.computers)">
+                <input
+                  class="field-input number-input"
+                  formControlName="computers"
+                  type="number"
+                  min="0"
+                  [class.field-input-error]="hasError(siteForm.controls.computers)"
+                >
+                <div class="number-stepper">
+                  <button
+                    class="number-stepper-button number-stepper-button-increment"
+                    type="button"
+                    (click)="stepControl(siteForm.controls.computers, 1, 0)"
+                    aria-label="Augmenter le nombre d'ordinateurs"
+                  >
+                    +
+                  </button>
+                  <button
+                    class="number-stepper-button"
+                    type="button"
+                    (click)="stepControl(siteForm.controls.computers, -1, 0)"
+                    aria-label="Diminuer le nombre d'ordinateurs"
+                  >
+                    -
+                  </button>
+                </div>
+              </div>
+            </label>
+          </div>
+
+          <section class="panel-soft rounded-[28px] p-5">
+            <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+              <div>
+                <p class="eyebrow">Matériaux</p>
+                <h3 class="font-heading mt-2 text-2xl font-semibold tracking-[-0.03em] text-[var(--ink)]">
+                  Composer l'inventaire de construction
+                </h3>
+                <p class="mt-2 max-w-[620px] text-sm leading-6 text-[var(--muted)]">
+                  Chaque ligne propose les matériaux définis dans les paramètres du calculateur.
+                </p>
+              </div>
+
+              <div class="flex flex-col gap-3 sm:flex-row">
+                <button
+                  class="inline-flex items-center justify-center rounded-full border border-[var(--line-strong)] bg-white px-4 py-2 text-sm font-semibold text-[var(--ink)] transition hover:-translate-y-0.5 hover:bg-[rgba(20,51,45,0.05)]"
+                  type="button"
+                  (click)="openCalculatorSettingsForNewMaterial()"
+                  data-testid="open-new-material-settings"
+                >
+                  Créer un nouveau matériau
+                </button>
+              </div>
+            </div>
+
+            <div class="mt-6 space-y-3" formArrayName="materials">
+              @for (material of materials.controls; track trackMaterial($index, material); let i = $index) {
+                <div
+                  class="material-row rounded-[22px] border border-[rgba(20,51,45,0.08)] bg-white/78 p-4"
+                  [formGroupName]="i"
+                >
+                  <div class="grid gap-3 md:grid-cols-[minmax(0,1fr)_190px_auto]">
+                    <label class="field-shell field-shell-compact">
+                      <span class="field-label">Matériau</span>
+                      <select
+                        class="field-input"
+                        formControlName="materialId"
+                        [class.field-input-error]="hasError(material.controls.materialId)"
+                      >
+                        <option value="">Sélectionner un matériau</option>
+                        @for (configuredMaterial of configuredMaterials(); track configuredMaterial.id) {
+                          <option [value]="configuredMaterial.id">{{ configuredMaterial.name }}</option>
+                        }
+                      </select>
+                      @if (resolveConfiguredMaterial(material.controls.materialId.value); as configuredMaterial) {
+                        <span class="field-helper">
+                          Facteur actif {{ configuredMaterial.factor | number:'1.0-2' }} tCO2e / unité
+                        </span>
+                      } @else {
+                        <span class="field-helper">Choisissez un matériau du catalogue.</span>
+                      }
+                    </label>
+
+                    <label class="field-shell field-shell-compact">
+                      <span class="field-label">Quantité</span>
+                      <div class="number-input-shell" [class.number-input-shell-error]="hasError(material.controls.quantity)">
+                        <input
+                          class="field-input number-input"
+                          formControlName="quantity"
+                          type="number"
+                          step="0.1"
+                          min="0.1"
+                          [class.field-input-error]="hasError(material.controls.quantity)"
+                        >
+                        <div class="number-stepper">
+                          <button
+                            class="number-stepper-button number-stepper-button-increment"
+                            type="button"
+                            (click)="stepControl(material.controls.quantity, 0.1, 0.1)"
+                            aria-label="Augmenter la quantité du matériau"
+                          >
+                            +
+                          </button>
+                          <button
+                            class="number-stepper-button"
+                            type="button"
+                            (click)="stepControl(material.controls.quantity, -0.1, 0.1)"
+                            aria-label="Diminuer la quantité du matériau"
+                          >
+                            -
+                          </button>
+                        </div>
+                      </div>
+                    </label>
+
+                    <button
+                      class="inline-flex items-center justify-center rounded-[18px] border border-[rgba(20,51,45,0.12)] px-4 py-3 text-sm font-semibold text-[var(--ink)] transition hover:bg-[rgba(20,51,45,0.06)] disabled:cursor-not-allowed disabled:opacity-40"
+                      type="button"
+                      [disabled]="materials.length === 1"
+                      (click)="removeMaterial(i)"
+                    >
+                      Supprimer
+                    </button>
+                  </div>
+                </div>
+              }
+
+              <button
+                class="inline-flex w-full items-center justify-center rounded-full bg-[var(--ink)] px-4 py-3 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-[#102a25]"
+                type="button"
+                (click)="addMaterial()"
+              >
+                Ajouter un matériau
+              </button>
+            </div>
+          </section>
+
+          <div class="flex justify-center border-t border-[rgba(20,51,45,0.08)] pb-6 pt-8">
+
+            <div class="flex w-full max-w-[520px] flex-col items-center gap-3 sm:flex-row sm:justify-center">
+              <button
+                class="inline-flex min-w-[190px] items-center justify-center rounded-full border border-[var(--line-strong)] bg-white px-6 py-3 text-sm font-semibold text-[var(--ink)] transition hover:-translate-y-0.5 hover:bg-[rgba(20,51,45,0.05)]"
+                type="button"
+                (click)="closeInputModal()"
+              >
+                Annuler
+              </button>
+              <button
+                class="inline-flex min-w-[190px] items-center justify-center rounded-full bg-[var(--moss)] px-6 py-3 text-sm font-semibold text-white shadow-[0_18px_40px_rgba(19,92,82,0.18)] transition hover:-translate-y-0.5 hover:bg-[#104a42]"
+                type="submit"
+              >
+                {{ result() ? "Actualiser l'analyse" : "Lancer l'analyse" }}
+              </button>
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
+  }
+</div>

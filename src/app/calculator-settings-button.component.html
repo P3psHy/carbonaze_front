@@ -1,0 +1,261 @@
+<button
+  class="floating-settings-button"
+  [class.floating-settings-button-shifted]="isCalculationsRoute()"
+  type="button"
+  (click)="openCalculatorSettings()"
+  aria-label="Ouvrir les parametres du calculateur"
+  title="Parametres du calculateur"
+>
+  <svg viewBox="0 0 24 24" aria-hidden="true">
+    <path
+      d="M10.3 2.8a1 1 0 0 1 1-.8h1.4a1 1 0 0 1 1 .8l.3 1.7a7.8 7.8 0 0 1 1.7.7l1.5-.8a1 1 0 0 1 1.2.2l1 1a1 1 0 0 1 .2 1.2l-.8 1.5c.3.5.5 1.1.7 1.7l1.7.3a1 1 0 0 1 .8 1v1.4a1 1 0 0 1-.8 1l-1.7.3a7.8 7.8 0 0 1-.7 1.7l.8 1.5a1 1 0 0 1-.2 1.2l-1 1a1 1 0 0 1-1.2.2l-1.5-.8a7.8 7.8 0 0 1-1.7.7l-.3 1.7a1 1 0 0 1-1 .8h-1.4a1 1 0 0 1-1-.8l-.3-1.7a7.8 7.8 0 0 1-1.7-.7l-1.5.8a1 1 0 0 1-1.2-.2l-1-1a1 1 0 0 1-.2-1.2l.8-1.5a7.8 7.8 0 0 1-.7-1.7L2.8 13.7a1 1 0 0 1-.8-1v-1.4a1 1 0 0 1 .8-1l1.7-.3c.1-.6.4-1.2.7-1.7l-.8-1.5a1 1 0 0 1 .2-1.2l1-1a1 1 0 0 1 1.2-.2l1.5.8c.5-.3 1.1-.5 1.7-.7l.3-1.7ZM12 15.4a3.4 3.4 0 1 0 0-6.8 3.4 3.4 0 0 0 0 6.8Z"
+    />
+  </svg>
+</button>
+
+@if (calculatorSettingsService.isSettingsOpen()) {
+  <div class="modal-backdrop modal-backdrop-elevated" (click)="closeCalculatorSettings()">
+    <div
+      class="modal-dialog modal-dialog-settings panel settings-catalog-modal"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="calculator-settings-modal-title"
+      (click)="$event.stopPropagation()"
+    >
+      <div class="modal-header">
+        <div class="settings-modal-heading">
+          <p class="eyebrow">Parametres du calculateur</p>
+          <h2 class="settings-modal-title font-heading" id="calculator-settings-modal-title">
+            Catalogue materiaux
+          </h2>
+          <p class="settings-modal-description">
+            Les materiaux definis ici sont proposes dans la saisie et reutilises dans tous les
+            calculs.
+          </p>
+        </div>
+
+        <button
+          class="modal-close"
+          type="button"
+          (click)="closeCalculatorSettings()"
+          aria-label="Fermer les parametres"
+        >
+          Fermer
+        </button>
+      </div>
+
+      <form
+        [formGroup]="calculatorSettingsForm"
+        (ngSubmit)="saveCalculatorSettings()"
+        class="modal-body settings-catalog-form"
+        data-testid="calculator-settings-form"
+      >
+        @if (settingsSubmitAttempted() && calculatorSettingsForm.invalid) {
+          <div class="settings-message settings-message-error">
+            Renseignez un nom unique et une valeur strictement positive pour chaque materiau.
+          </div>
+        }
+
+        @if (materialsSyncError(); as syncError) {
+          <div class="settings-message settings-message-error">
+            {{ syncError }}
+          </div>
+        }
+
+        @if (isSyncingMaterials()) {
+          <div class="settings-message settings-message-info">
+            Synchronisation du catalogue avec le backend...
+          </div>
+        }
+
+        <section class="panel-soft catalog-panel">
+          <div class="catalog-toolbar">
+            <div class="catalog-toolbar-copy">
+              <p class="eyebrow">Catalogue actif</p>
+              <h3 class="catalog-section-title font-heading">Retrouver et modifier un materiau</h3>
+              <p class="catalog-section-description">
+                Recherchez un materiau, ajustez sa valeur ou ajoutez-en un nouveau.
+              </p>
+            </div>
+
+            <div class="catalog-toolbar-actions">
+              <label class="field-shell catalog-search-field">
+                <span class="field-label">Rechercher</span>
+                <input
+                  class="field-input"
+                  [formControl]="materialSearchControl"
+                  type="text"
+                  placeholder="Ex. Acier"
+                  data-testid="material-search-input"
+                />
+              </label>
+
+              <button
+                class="catalog-primary-button"
+                type="button"
+                (click)="openCreateMaterialForm()"
+                data-testid="open-create-material-button"
+              >
+                Nouveau materiau
+              </button>
+            </div>
+          </div>
+
+          @if (isCreateMaterialFormOpen()) {
+            <section class="catalog-create-card" [formGroup]="newMaterialForm">
+              <div class="catalog-create-heading">
+                <div>
+                  <p class="eyebrow">Nouveau materiau</p>
+                  <h3 class="catalog-section-title font-heading">Ajouter au catalogue</h3>
+                  <p class="catalog-section-description">
+                    Ce materiau sera poste immediatement au backend puis ajoute a la liste.
+                  </p>
+                </div>
+
+                <button
+                  class="catalog-secondary-button"
+                  type="button"
+                  (click)="closeCreateMaterialForm()"
+                >
+                  Annuler
+                </button>
+              </div>
+
+              @if (newMaterialForm.invalid && (newMaterialForm.touched || newMaterialForm.dirty)) {
+                <div class="settings-message settings-message-error">
+                  Renseignez un nom et une valeur strictement positive.
+                </div>
+              }
+
+              <div class="catalog-create-grid">
+                <label class="field-shell">
+                  <span class="field-label">Nom du materiau</span>
+                  <input
+                    #newMaterialNameInput
+                    class="field-input"
+                    formControlName="name"
+                    type="text"
+                    data-testid="new-material-name-input"
+                    [class.field-input-error]="hasSettingsError(newMaterialForm.controls.name)"
+                  />
+                </label>
+
+                <label class="field-shell">
+                  <span class="field-label">Valeur</span>
+                  <input
+                    class="field-input"
+                    formControlName="factor"
+                    type="number"
+                    step="0.01"
+                    min="0.01"
+                    data-testid="new-material-factor-input"
+                    [class.field-input-error]="hasSettingsError(newMaterialForm.controls.factor)"
+                  />
+                </label>
+              </div>
+
+              <div class="catalog-create-actions">
+                <button
+                  class="catalog-primary-button"
+                  type="button"
+                  (click)="addConfiguredMaterial()"
+                  [disabled]="isCreatingMaterial() || isSyncingMaterials()"
+                  data-testid="add-material-definition-button"
+                >
+                  {{ isCreatingMaterial() ? 'Ajout...' : 'Ajouter au catalogue' }}
+                </button>
+              </div>
+            </section>
+          }
+
+          <div class="catalog-list" formArrayName="materials" #catalogList>
+            @for (
+              entry of filteredConfiguredMaterials;
+              track trackConfiguredMaterial(entry.index, entry.material)
+            ) {
+              <div
+                class="catalog-row"
+                [class.catalog-row-added]="
+                  isRecentlyAddedMaterial(entry.material.controls.id.value)
+                "
+                [attr.data-material-id]="entry.material.controls.id.value"
+                [formGroupName]="entry.index"
+              >
+                <div class="catalog-row-grid">
+                  <label class="field-shell field-shell-compact">
+                    <span class="field-label">Materiau</span>
+                    <input
+                      class="field-input"
+                      formControlName="name"
+                      type="text"
+                      [class.field-input-error]="hasSettingsError(entry.material.controls.name)"
+                    />
+                  </label>
+
+                  <label class="field-shell field-shell-compact">
+                    <span class="field-label">Valeur</span>
+                    <input
+                      class="field-input"
+                      formControlName="factor"
+                      type="number"
+                      step="0.01"
+                      min="0.01"
+                      [class.field-input-error]="hasSettingsError(entry.material.controls.factor)"
+                    />
+                  </label>
+
+                  <button
+                    class="catalog-secondary-button catalog-row-delete"
+                    type="button"
+                    [disabled]="configuredMaterialsFormArray.length === 1"
+                    (click)="removeConfiguredMaterial(entry.index)"
+                  >
+                    Supprimer
+                  </button>
+                </div>
+              </div>
+            }
+
+            @if (!hasVisibleConfiguredMaterials()) {
+              <div class="catalog-empty">Aucun materiau ne correspond a cette recherche.</div>
+            }
+          </div>
+
+          @if (
+            configuredMaterialsFormArray.hasError('duplicateNames') && settingsSubmitAttempted()
+          ) {
+            <p class="catalog-help catalog-help-error">
+              Deux materiaux ne peuvent pas partager le meme nom.
+            </p>
+          }
+        </section>
+
+        <div class="catalog-footer">
+          <p class="catalog-footer-text">
+            Le catalogue est recharge depuis l'API a l'ouverture et conserve localement en secours.
+          </p>
+
+          <div class="catalog-footer-actions">
+            <button
+              class="catalog-secondary-button"
+              type="button"
+              (click)="resetCalculatorSettingsForm()"
+            >
+              Valeurs par defaut
+            </button>
+            <button
+              class="catalog-secondary-button"
+              type="button"
+              (click)="closeCalculatorSettings()"
+            >
+              Annuler
+            </button>
+            <button class="catalog-success-button" type="submit" data-testid="save-settings-button">
+              Enregistrer les parametres
+            </button>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+}
