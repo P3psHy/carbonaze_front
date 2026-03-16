@@ -3,15 +3,66 @@ import { Observable, of } from 'rxjs';
 
 import {
   ImpactCategory,
+  MaterialFactorDefinition,
+  MaterialFactorMap,
   MaterialImpact,
   SiteImpactResult,
   SiteInputPayload,
 } from './site-impact.models';
 
+export const MATERIAL_FACTOR_DEFINITIONS: MaterialFactorDefinition[] = [
+  {
+    key: 'beton',
+    label: 'Béton',
+    helper: 'Tous les bétons et variantes bas carbone',
+    defaultFactor: 0.18,
+    aliases: ['beton'],
+  },
+  {
+    key: 'acier',
+    label: 'Acier',
+    helper: 'Structures et composants acier',
+    defaultFactor: 1.9,
+    aliases: ['acier', 'steel'],
+  },
+  {
+    key: 'verre',
+    label: 'Verre',
+    helper: 'Façades, vitrages et cloisons',
+    defaultFactor: 1.05,
+    aliases: ['verre', 'glass', 'vitrage'],
+  },
+  {
+    key: 'bois',
+    label: 'Bois',
+    helper: 'Bois massif, CLT et dérivés',
+    defaultFactor: 0.08,
+    aliases: ['bois', 'wood'],
+  },
+  {
+    key: 'aluminium',
+    label: 'Aluminium',
+    helper: 'Profils, façades et menuiseries',
+    defaultFactor: 8.2,
+    aliases: ['aluminium', 'alu'],
+  },
+  {
+    key: 'default',
+    label: 'Autres',
+    helper: 'Facteur appliqué si aucun matériau connu ne correspond',
+    defaultFactor: 0.35,
+    aliases: [],
+  },
+];
+
 @Injectable({ providedIn: 'root' })
 export class SiteImpactService {
-  calculateImpact(payload: SiteInputPayload): Observable<SiteImpactResult> {
-    const materialImpacts = this.buildMaterialImpacts(payload.materials);
+  calculateImpact(
+    payload: SiteInputPayload,
+    materialFactors?: Partial<MaterialFactorMap>,
+  ): Observable<SiteImpactResult> {
+    const normalizedFactors = this.normalizeMaterialFactors(materialFactors);
+    const materialImpacts = this.buildMaterialImpacts(payload.materials, normalizedFactors);
     const materialsEmission = this.sum(materialImpacts.map((material) => material.emission));
     const energyEmission = payload.energyMwh * 0.055;
     const gasEmission = payload.gasMwh * 0.227;
@@ -51,13 +102,40 @@ export class SiteImpactService {
     });
   }
 
-  private buildMaterialImpacts(materials: SiteInputPayload['materials']): MaterialImpact[] {
+  getDefaultMaterialFactors(): MaterialFactorMap {
+    return MATERIAL_FACTOR_DEFINITIONS.reduce(
+      (factors, definition) => ({
+        ...factors,
+        [definition.key]: definition.defaultFactor,
+      }),
+      {} as MaterialFactorMap,
+    );
+  }
+
+  normalizeMaterialFactors(materialFactors?: Partial<MaterialFactorMap>): MaterialFactorMap {
+    const defaults = this.getDefaultMaterialFactors();
+
+    for (const definition of MATERIAL_FACTOR_DEFINITIONS) {
+      const value = materialFactors?.[definition.key];
+
+      if (typeof value === 'number' && Number.isFinite(value) && value > 0) {
+        defaults[definition.key] = this.round(value, 2);
+      }
+    }
+
+    return defaults;
+  }
+
+  private buildMaterialImpacts(
+    materials: SiteInputPayload['materials'],
+    materialFactors: MaterialFactorMap,
+  ): MaterialImpact[] {
     const palette = ['#14532d', '#0f766e', '#ca8a04', '#b45309', '#7c2d12', '#155e75'];
 
     return materials
       .filter((material) => material.name.trim() && material.quantity > 0)
       .map((material, index) => {
-        const factor = this.resolveMaterialFactor(material.name);
+        const factor = this.resolveMaterialFactor(material.name, materialFactors);
         const emission = this.round(material.quantity * factor);
 
         return {
@@ -82,17 +160,17 @@ export class SiteImpactService {
     const items = [
       {
         key: 'materials' as const,
-        label: 'Materiaux',
+        label: 'Matériaux',
         emission: this.round(values.materialsEmission),
         color: '#14532d',
-        helper: 'Impact cumule des materiaux saisis',
+        helper: 'Impact cumulé des matériaux saisis',
       },
       {
         key: 'energy' as const,
-        label: 'Electricite',
+        label: 'Électricité',
         emission: this.round(values.energyEmission),
         color: '#0f766e',
-        helper: 'Consommation electrique annuelle',
+        helper: 'Consommation électrique annuelle',
       },
       {
         key: 'gas' as const,
@@ -103,17 +181,17 @@ export class SiteImpactService {
       },
       {
         key: 'parking' as const,
-        label: 'Mobilite & parking',
+        label: 'Mobilité & parking',
         emission: this.round(values.parkingEmission),
         color: '#b45309',
-        helper: 'Stationnement et mobilite collaborateurs',
+        helper: 'Stationnement et mobilité collaborateurs',
       },
       {
         key: 'equipment' as const,
-        label: 'Equipement IT',
+        label: 'Équipement IT',
         emission: this.round(values.equipmentEmission),
         color: '#155e75',
-        helper: 'Ordinateurs et equipements postes',
+        helper: 'Ordinateurs et équipements postes',
       },
     ];
 
@@ -133,39 +211,22 @@ export class SiteImpactService {
     const topMaterial = [...materials].sort((left, right) => right.emission - left.emission)[0];
 
     return [
-      `${dominantCategory.label} represente ${dominantCategory.percentage}% des emissions estimees du site.`,
-      `Le site emet environ ${this.round(totalEmission / Math.max(payload.employees, 1), 2)} tCO2e par employe.`,
+      `${dominantCategory.label} représente ${dominantCategory.percentage}% des émissions estimées du site.`,
+      `Le site émet environ ${this.round(totalEmission / Math.max(payload.employees, 1), 2)} tCO2e par employé.`,
       topMaterial
-        ? `${topMaterial.name} est le materiau le plus impactant avec ${topMaterial.emission} tCO2e estimees.`
-        : 'Ajoutez des materiaux pour enrichir l analyse construction.',
+        ? `${topMaterial.name} est le matériau le plus impactant avec ${topMaterial.emission} tCO2e estimées.`
+        : "Ajoutez des matériaux pour enrichir l'analyse construction.",
       `${payload.parkingSpaces} places et ${payload.computers} postes informatiques alimentent deja les stats de pilotage.`,
     ];
   }
 
-  private resolveMaterialFactor(name: string): number {
+  private resolveMaterialFactor(name: string, materialFactors: MaterialFactorMap): number {
     const key = name.trim().toLowerCase();
+    const definition = MATERIAL_FACTOR_DEFINITIONS.find(
+      (item) => item.key !== 'default' && item.aliases.some((alias) => key.includes(alias)),
+    );
 
-    if (key.includes('beton')) {
-      return 0.18;
-    }
-
-    if (key.includes('acier')) {
-      return 1.9;
-    }
-
-    if (key.includes('verre')) {
-      return 1.05;
-    }
-
-    if (key.includes('bois')) {
-      return 0.08;
-    }
-
-    if (key.includes('aluminium')) {
-      return 8.2;
-    }
-
-    return 0.35;
+    return materialFactors[definition?.key ?? 'default'];
   }
 
   private sum(values: number[]): number {

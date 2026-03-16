@@ -3,6 +3,18 @@ export interface SiteMaterialInput {
   quantity: number;
 }
 
+export type MaterialFactorKey = 'beton' | 'acier' | 'verre' | 'bois' | 'aluminium' | 'default';
+
+export type MaterialFactorMap = Record<MaterialFactorKey, number>;
+
+export interface MaterialFactorDefinition {
+  key: MaterialFactorKey;
+  label: string;
+  helper: string;
+  defaultFactor: number;
+  aliases: string[];
+}
+
 export interface SiteInputPayload {
   siteName: string;
   city: string;
