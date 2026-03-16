@@ -3,6 +3,8 @@ import { HttpTestingController, provideHttpClientTesting } from '@angular/common
 import { TestBed } from '@angular/core/testing';
 import { Router, provideRouter } from '@angular/router';
 import { RouterTestingHarness } from '@angular/router/testing';
+import { ViewportScroller } from '@angular/common';
+import { vi } from 'vitest';
 
 import { App } from './app';
 import { routes } from './app.routes';
@@ -31,6 +33,27 @@ describe('App', () => {
     const fixture = TestBed.createComponent(App);
     const app = fixture.componentInstance;
     expect(app).toBeTruthy();
+  });
+
+  it('should navigate home and reset the scroll position from the brand button', async () => {
+    const fixture = TestBed.createComponent(App);
+    const router = TestBed.inject(Router);
+    const viewportScroller = TestBed.inject(ViewportScroller);
+    const navigateSpy = vi.spyOn(router, 'navigateByUrl').mockResolvedValue(true);
+    const scrollSpy = vi.spyOn(viewportScroller, 'scrollToPosition');
+
+    fixture.detectChanges();
+
+    const root = fixture.nativeElement as HTMLElement;
+    const brandButton = root.querySelector('.brand-home-button') as HTMLButtonElement | null;
+
+    expect(brandButton).toBeTruthy();
+
+    brandButton?.click();
+    await fixture.whenStable();
+
+    expect(navigateSpy).toHaveBeenCalledWith('/');
+    expect(scrollSpy).toHaveBeenCalledWith([0, 0]);
   });
 
   it('should render the landing page on the default route', async () => {
