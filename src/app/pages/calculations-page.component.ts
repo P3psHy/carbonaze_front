@@ -21,9 +21,9 @@ import {
 } from '@angular/forms';
 import { finalize } from 'rxjs';
 
-import { environment } from '../../environment/environment';
 import {
   CalculationPersistenceService,
+  LoadedBilanDraft,
   SavedCalculationRecord,
 } from '../calculation-persistence.service';
 import {
@@ -42,11 +42,6 @@ type MaterialFormGroup = FormGroup<{
 
 type SaveFeedback = {
   kind: 'success' | 'error';
-  message: string;
-};
-
-type HistoryFeedback = {
-  kind: 'error' | 'success';
   message: string;
 };
 
@@ -82,13 +77,8 @@ export class CalculationsPageComponent {
   protected readonly lastCalculatedPayload = signal<SiteInputPayload | null>(null);
   protected readonly submitAttempted = signal(false);
   protected readonly isInputModalOpen = signal(false);
-  protected readonly isHistoryModalOpen = signal(false);
   protected readonly isSavingCalculation = signal(false);
-  protected readonly isHistoryLoading = signal(false);
   protected readonly saveFeedback = signal<SaveFeedback | null>(null);
-  protected readonly historyFeedback = signal<HistoryFeedback | null>(null);
-  protected readonly savedCalculations = signal<SavedCalculationRecord[]>([]);
-  protected readonly deletingBilanIds = signal<number[]>([]);
   protected readonly configuredMaterials = this.calculatorSettingsService.configuredMaterials;
 
   protected readonly categoryChart = computed(() => {
@@ -132,9 +122,10 @@ export class CalculationsPageComponent {
   constructor() {
     let modalLockActive = false;
     let previousConfiguredMaterials = this.configuredMaterials();
+    const loadedBilan = this.resolveLoadedBilanFromNavigation();
 
     effect(() => {
-      const shouldLockBody = this.isInputModalOpen() || this.isHistoryModalOpen();
+      const shouldLockBody = this.isInputModalOpen();
 
       if (shouldLockBody === modalLockActive) {
         return;
@@ -166,6 +157,12 @@ export class CalculationsPageComponent {
     });
 
     afterNextRender(() => {
+      if (loadedBilan) {
+        this.applyLoadedBilanDraft(loadedBilan);
+        this.viewportScroller.scrollToPosition([0, 0]);
+        return;
+      }
+
       if (!this.result()) {
         this.openInputModal();
       }
@@ -184,11 +181,6 @@ export class CalculationsPageComponent {
       return;
     }
 
-    if (this.isHistoryModalOpen()) {
-      this.closeHistoryModal();
-      return;
-    }
-
     if (this.isInputModalOpen()) {
       this.closeInputModal();
     }
@@ -202,16 +194,6 @@ export class CalculationsPageComponent {
     this.submitAttempted.set(false);
     this.siteForm.markAsUntouched();
     this.isInputModalOpen.set(true);
-  }
-
-  protected openHistoryModal(): void {
-    this.isHistoryModalOpen.set(true);
-    this.loadSavedCalculations();
-  }
-
-  protected closeHistoryModal(): void {
-    this.isHistoryModalOpen.set(false);
-    this.historyFeedback.set(null);
   }
 
   protected closeInputModal(): void {
@@ -295,10 +277,6 @@ export class CalculationsPageComponent {
       .pipe(finalize(() => this.isSavingCalculation.set(false)))
       .subscribe({
         next: (savedCalculation) => {
-          this.savedCalculations.update((history) => [
-            savedCalculation,
-            ...history.filter((entry) => entry.bilanId !== savedCalculation.bilanId),
-          ]);
           this.saveFeedback.set({
             kind: 'success',
             message: this.buildSuccessMessage(savedCalculation),
@@ -307,43 +285,7 @@ export class CalculationsPageComponent {
         error: () => {
           this.saveFeedback.set({
             kind: 'error',
-            message: `Impossible de sauvegarder le calcul. Verifiez que le backend Carbonaze repond sur ${environment.apiUrl}.`,
-          });
-        },
-      });
-  }
-
-  protected isDeletingBilan(bilanId: number): boolean {
-    return this.deletingBilanIds().includes(bilanId);
-  }
-
-  protected deleteSavedCalculation(bilanId: number): void {
-    if (this.isDeletingBilan(bilanId)) {
-      return;
-    }
-
-    this.deletingBilanIds.update((ids) => [...ids, bilanId]);
-    this.historyFeedback.set(null);
-
-    this.calculationPersistenceService
-      .deleteBilan(bilanId)
-      .pipe(
-        finalize(() => {
-          this.deletingBilanIds.update((ids) => ids.filter((id) => id !== bilanId));
-        }),
-      )
-      .subscribe({
-        next: () => {
-          this.savedCalculations.update((history) => history.filter((entry) => entry.bilanId !== bilanId));
-          this.historyFeedback.set({
-            kind: 'success',
-            message: "Calcul supprime de l'historique.",
-          });
-        },
-        error: () => {
-          this.historyFeedback.set({
-            kind: 'error',
-            message: `Impossible de supprimer ce calcul. Verifiez que le backend Carbonaze repond sur ${environment.apiUrl}.`,
+            message: "Impossible de sauvegarder le calcul. Verifiez que le backend Carbonaze repond sur l'API.",
           });
         },
       });
@@ -382,25 +324,50 @@ export class CalculationsPageComponent {
     return `Calcul sauvegarde le ${this.formatIsoDate(savedCalculation.calculationDate)} pour ${savedCalculation.siteName}.`;
   }
 
-  private loadSavedCalculations(): void {
-    this.isHistoryLoading.set(true);
-    this.historyFeedback.set(null);
+  private applyLoadedBilanDraft(loadedBilan: LoadedBilanDraft): void {
+    this.siteForm.patchValue({
+      siteName: loadedBilan.siteName,
+      city: loadedBilan.city,
+      energyMwh: loadedBilan.energyMwh,
+      gasMwh: loadedBilan.gasMwh,
+      employees: null,
+      parkingSpaces: null,
+      computers: null,
+    });
 
-    this.calculationPersistenceService
-      .getAllBilans()
-      .pipe(finalize(() => this.isHistoryLoading.set(false)))
-      .subscribe({
-        next: (history) => {
-          this.savedCalculations.set(history);
-        },
-        error: () => {
-          this.savedCalculations.set([]);
-          this.historyFeedback.set({
-            kind: 'error',
-            message: `Impossible de charger l'historique. Verifiez que le backend Carbonaze repond sur ${environment.apiUrl}.`,
-          });
-        },
-      });
+    this.materials.clear();
+    this.materials.push(this.createMaterial());
+
+    this.siteForm.markAsPristine();
+    this.siteForm.markAsUntouched();
+    this.submitAttempted.set(false);
+    this.result.set(null);
+    this.lastCalculatedPayload.set(null);
+    this.saveFeedback.set({
+      kind: 'success',
+      message: this.buildLoadedBilanMessage(loadedBilan),
+    });
+    this.isInputModalOpen.set(true);
+  }
+
+  private resolveLoadedBilanFromNavigation(): LoadedBilanDraft | null {
+    const navigationState =
+      (this.router.getCurrentNavigation()?.extras.state?.['loadedBilan'] as LoadedBilanDraft | undefined) ??
+      (history.state?.loadedBilan as LoadedBilanDraft | undefined);
+
+    if (!navigationState || typeof navigationState !== 'object') {
+      return null;
+    }
+
+    return navigationState;
+  }
+
+  private buildLoadedBilanMessage(loadedBilan: LoadedBilanDraft): string {
+    const dateLabel = loadedBilan.calculationDate
+      ? ` du ${this.formatIsoDate(loadedBilan.calculationDate)}`
+      : '';
+
+    return `Bilan charge depuis l'API${dateLabel}. Les consommations disponibles ont ete pre-remplies. Completez les champs manquants pour recalculer le detail.`;
   }
 
   private createMaterial(materialId = '', quantity: number | null = null): MaterialFormGroup {

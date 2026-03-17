@@ -16,12 +16,12 @@
 
           <div>
             <p class="font-heading text-xl font-semibold tracking-[-0.03em] text-[var(--ink)]">Carbonaze</p>
-            <p class="text-sm text-[var(--muted)]">Plateforme de calcul et d'analyse des émissions CO2</p>
+            <p class="text-sm text-[var(--muted)]">Plateforme de calcul et d'analyse des emissions CO2</p>
           </div>
         </button>
 
         <div class="flex flex-col gap-3 sm:flex-row sm:items-center">
-          <nav class="hidden items-center gap-2 rounded-full bg-white/60 p-1 text-sm text-[var(--muted)] md:flex">
+          <nav class="flex flex-wrap items-center gap-2 rounded-full bg-white/60 p-1 text-sm text-[var(--muted)]">
             <a
               class="nav-pill"
               [routerLink]="['/']"
@@ -31,7 +31,7 @@
               Accueil
             </a>
             <a class="nav-pill" [routerLink]="['/calculs']" routerLinkActive="nav-pill-active">Calculs</a>
-            <button class="nav-pill nav-pill-button" type="button" (click)="openHistoryModal()">
+            <button class="nav-pill nav-pill-button" type="button" data-testid="history-button" (click)="openHistoryModal()">
               Historique
             </button>
           </nav>
@@ -93,32 +93,38 @@
           </div>
         } @else {
           <div class="history-list">
-            @for (savedCalculation of savedCalculations(); track savedCalculation.bilanId) {
-              <article class="history-card">
+            @for (savedCalculation of savedCalculations(); track savedCalculation.id) {
+              <article
+                class="history-card history-card-clickable"
+                tabindex="0"
+                role="button"
+                [attr.aria-label]="'Charger le bilan ' + savedCalculation.id"
+                (click)="loadSavedCalculation(savedCalculation.id)"
+                (keydown.enter)="loadSavedCalculation(savedCalculation.id)"
+                (keydown.space)="loadSavedCalculation(savedCalculation.id); $event.preventDefault()"
+              >
                 <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                   <div class="min-w-0">
-                    <p class="history-card-title">{{ savedCalculation.siteName }}</p>
-                    <p class="history-card-meta">
-                      Bilan #{{ savedCalculation.bilanId }} • Site #{{ savedCalculation.siteId }}
-                    </p>
+                    <p class="history-card-title">{{ resolveHistoryTitle(savedCalculation) }}</p>
+                    <p class="history-card-meta">{{ resolveHistorySubtitle(savedCalculation) }}</p>
                   </div>
 
                   <div class="history-metrics">
                     <div class="history-metric">
-                      <span>Date</span>
-                      <strong>{{ savedCalculation.calculationDate }}</strong>
+                      <span>Bilan</span>
+                      <strong>#{{ savedCalculation.id }}</strong>
                     </div>
                     <div class="history-metric">
                       <span>Total</span>
-                      <strong>{{ savedCalculation.totalCo2 | number:'1.0-1' }} tCO2e</strong>
+                      <strong>{{ resolveHistoryTotal(savedCalculation) }}</strong>
                     </div>
                     <button
                       class="history-delete-button"
                       type="button"
-                      [disabled]="isDeletingBilan(savedCalculation.bilanId)"
-                      (click)="deleteSavedCalculation(savedCalculation.bilanId)"
+                      [disabled]="isDeletingBilan(savedCalculation.id)"
+                      (click)="$event.stopPropagation(); deleteSavedCalculation(savedCalculation.id)"
                     >
-                      {{ isDeletingBilan(savedCalculation.bilanId) ? 'Suppression...' : 'Supprimer' }}
+                      {{ isDeletingBilan(savedCalculation.id) ? 'Suppression...' : 'Supprimer' }}
                     </button>
                   </div>
                 </div>

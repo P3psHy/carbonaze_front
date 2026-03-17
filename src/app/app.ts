@@ -1,16 +1,20 @@
-import { DecimalPipe, ViewportScroller } from '@angular/common';
+import { ViewportScroller } from '@angular/common';
 import { Component, DestroyRef, HostListener, inject, signal } from '@angular/core';
 import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { finalize } from 'rxjs';
 
 import { BodyScrollLockService } from './body-scroll-lock.service';
-import { CalculationPersistenceService, SavedCalculationRecord } from './calculation-persistence.service';
+import {
+  ApiBilanRecord,
+  CalculationPersistenceService,
+  LoadedBilanDraft,
+} from './calculation-persistence.service';
 import { CalculatorSettingsButtonComponent } from './calculator-settings-button.component';
 import { environment } from '../environment/environment';
 
 @Component({
   selector: 'app-root',
-  imports: [RouterOutlet, RouterLink, RouterLinkActive, CalculatorSettingsButtonComponent, DecimalPipe],
+  imports: [RouterOutlet, RouterLink, RouterLinkActive, CalculatorSettingsButtonComponent],
   templateUrl: './app.html',
   styleUrl: './app.css',
 })
@@ -23,7 +27,7 @@ export class App {
 
   protected readonly isHistoryModalOpen = signal(false);
   protected readonly isHistoryLoading = signal(false);
-  protected readonly savedCalculations = signal<SavedCalculationRecord[]>([]);
+  protected readonly savedCalculations = signal<ApiBilanRecord[]>([]);
   protected readonly deletingBilanIds = signal<number[]>([]);
   protected readonly historyFeedback = signal<{ kind: 'success' | 'error'; message: string } | null>(null);
 
@@ -87,7 +91,7 @@ export class App {
       )
       .subscribe({
         next: () => {
-          this.savedCalculations.update((history) => history.filter((entry) => entry.bilanId !== bilanId));
+          this.savedCalculations.update((history) => history.filter((entry) => entry.id !== bilanId));
           this.historyFeedback.set({
             kind: 'success',
             message: "Calcul supprime de l'historique.",
@@ -100,6 +104,63 @@ export class App {
           });
         },
       });
+  }
+
+  protected loadSavedCalculation(bilanId: number): void {
+    const historyEntry = this.savedCalculations().find((entry) => entry.id === bilanId);
+
+    if (!historyEntry) {
+      return;
+    }
+
+    this.isHistoryLoading.set(true);
+    this.historyFeedback.set(null);
+
+    this.calculationPersistenceService
+      .getBilanById(bilanId)
+      .pipe(finalize(() => this.isHistoryLoading.set(false)))
+      .subscribe({
+        next: (bilan) => {
+          const loadedBilan = this.buildLoadedBilanDraft(bilan, historyEntry);
+
+          this.closeHistoryModal();
+          void this.router.navigate(['/calculs'], { state: { loadedBilan } }).then((navigated) => {
+            if (navigated) {
+              this.viewportScroller.scrollToPosition([0, 0]);
+            }
+          });
+        },
+        error: () => {
+          this.historyFeedback.set({
+            kind: 'error',
+            message: `Impossible de charger ce bilan. Verifiez que le backend Carbonaze repond sur ${environment.apiUrl}.`,
+          });
+        },
+      });
+  }
+
+  protected resolveHistoryTitle(bilan: ApiBilanRecord): string {
+    const siteName = bilan.site?.name?.trim();
+    return siteName || `Bilan #${bilan.id}`;
+  }
+
+  protected resolveHistorySubtitle(bilan: ApiBilanRecord): string {
+    const segments = [this.formatHistoryDate(bilan.calculationDate)];
+    const city = bilan.site?.city?.trim();
+
+    if (city) {
+      segments.push(city);
+    }
+
+    return segments.join(' - ');
+  }
+
+  protected resolveHistoryTotal(bilan: ApiBilanRecord): string {
+    if (typeof bilan.totalCo2 !== 'number' || !Number.isFinite(bilan.totalCo2)) {
+      return 'Total indisponible';
+    }
+
+    return `${bilan.totalCo2.toFixed(1)} tCO2e`;
   }
 
   private loadSavedCalculations(): void {
@@ -121,5 +182,38 @@ export class App {
           });
         },
       });
+  }
+
+  private buildLoadedBilanDraft(bilan: ApiBilanRecord, historyEntry: ApiBilanRecord): LoadedBilanDraft {
+    return {
+      bilanId: bilan.id,
+      siteId: bilan.siteId ?? historyEntry.siteId,
+      siteName: historyEntry.site?.name?.trim() ?? bilan.site?.name?.trim() ?? '',
+      city: historyEntry.site?.city?.trim() ?? bilan.site?.city?.trim() ?? '',
+      energyMwh:
+        typeof bilan.electricityKwhYear === 'number' && Number.isFinite(bilan.electricityKwhYear)
+          ? bilan.electricityKwhYear / 1000
+          : null,
+      gasMwh:
+        typeof bilan.gasKwhYear === 'number' && Number.isFinite(bilan.gasKwhYear)
+          ? bilan.gasKwhYear / 1000
+          : null,
+      totalCo2: typeof bilan.totalCo2 === 'number' && Number.isFinite(bilan.totalCo2) ? bilan.totalCo2 : null,
+      calculationDate: bilan.calculationDate ?? historyEntry.calculationDate ?? '',
+    };
+  }
+
+  private formatHistoryDate(value?: string): string {
+    if (!value) {
+      return 'Date inconnue';
+    }
+
+    const parsed = new Date(value);
+
+    if (Number.isNaN(parsed.getTime())) {
+      return value;
+    }
+
+    return parsed.toLocaleDateString('fr-FR');
   }
 }

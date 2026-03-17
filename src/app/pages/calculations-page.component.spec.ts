@@ -6,9 +6,8 @@ import { of, throwError } from 'rxjs';
 import { vi } from 'vitest';
 
 import { BodyScrollLockService } from '../body-scroll-lock.service';
-import { CalculationPersistenceService } from '../calculation-persistence.service';
+import { CalculationPersistenceService, LoadedBilanDraft } from '../calculation-persistence.service';
 import { CalculatorSettingsService } from '../calculator-settings.service';
-import { environment } from '../../environment/environment';
 import { SiteImpactResult, SiteInputPayload } from '../site-impact.models';
 import { SiteImpactService } from '../site-impact.service';
 import { CalculationsPageComponent } from './calculations-page.component';
@@ -90,11 +89,21 @@ describe('CalculationsPageComponent', () => {
     calculationDate: '2026-03-16',
   };
 
+  const loadedBilan: LoadedBilanDraft = {
+    bilanId: 18,
+    siteId: 7,
+    siteName: 'HQ Paris',
+    city: 'Paris',
+    energyMwh: 10,
+    gasMwh: 2,
+    totalCo2: 12.4,
+    calculationDate: '2026-03-16',
+  };
+
   let siteImpactService: { calculateImpact: ReturnType<typeof vi.fn> };
   let calculationPersistenceService: {
     saveCalculation: ReturnType<typeof vi.fn>;
-    getAllBilans: ReturnType<typeof vi.fn>;
-    deleteBilan: ReturnType<typeof vi.fn>;
+    getBilanById: ReturnType<typeof vi.fn>;
   };
   let bodyScrollLockService: { lock: ReturnType<typeof vi.fn>; unlock: ReturnType<typeof vi.fn> };
   let calculatorSettingsService: {
@@ -102,7 +111,7 @@ describe('CalculationsPageComponent', () => {
     isSettingsOpen: ReturnType<typeof signal<boolean>>;
     openSettings: ReturnType<typeof vi.fn>;
   };
-  let router: { navigateByUrl: ReturnType<typeof vi.fn> };
+  let router: { navigateByUrl: ReturnType<typeof vi.fn>; getCurrentNavigation: ReturnType<typeof vi.fn> };
   let viewportScroller: { scrollToPosition: ReturnType<typeof vi.fn> };
 
   beforeEach(async () => {
@@ -116,8 +125,7 @@ describe('CalculationsPageComponent', () => {
     };
     calculationPersistenceService = {
       saveCalculation: vi.fn(() => of(savedCalculation)),
-      getAllBilans: vi.fn(() => of([savedCalculation])),
-      deleteBilan: vi.fn(() => of(void 0)),
+      getBilanById: vi.fn(),
     };
     bodyScrollLockService = {
       lock: vi.fn(),
@@ -130,6 +138,7 @@ describe('CalculationsPageComponent', () => {
     };
     router = {
       navigateByUrl: vi.fn(() => Promise.resolve(true)),
+      getCurrentNavigation: vi.fn(() => null),
     };
     viewportScroller = {
       scrollToPosition: vi.fn(),
@@ -279,7 +288,7 @@ describe('CalculationsPageComponent', () => {
     expect(component.saveFeedback()).toEqual(
       expect.objectContaining({
         kind: 'error',
-        message: expect.stringContaining(environment.apiUrl),
+        message: expect.stringContaining("l'API"),
       }),
     );
   });
@@ -295,31 +304,27 @@ describe('CalculationsPageComponent', () => {
     expect(component.siteForm.controls.employees.value).toBe(1);
   });
 
-  it('loads the saved calculations history when opening the history modal', () => {
+  it('loads the bilan draft passed through navigation state on first render', async () => {
+    router.getCurrentNavigation.mockReturnValueOnce({
+      extras: {
+        state: {
+          loadedBilan,
+        },
+      },
+    });
+
     const fixture = TestBed.createComponent(CalculationsPageComponent);
     const component = fixture.componentInstance as any;
 
-    component.openHistoryModal();
+    fixture.detectChanges();
+    await fixture.whenStable();
 
-    expect(component.isHistoryModalOpen()).toBe(true);
-    expect(calculationPersistenceService.getAllBilans).toHaveBeenCalledTimes(1);
-    expect(component.savedCalculations()).toEqual([savedCalculation]);
-  });
-
-  it('deletes a saved calculation from the history modal', () => {
-    const fixture = TestBed.createComponent(CalculationsPageComponent);
-    const component = fixture.componentInstance as any;
-
-    component.savedCalculations.set([savedCalculation]);
-
-    component.deleteSavedCalculation(savedCalculation.bilanId);
-
-    expect(calculationPersistenceService.deleteBilan).toHaveBeenCalledWith(savedCalculation.bilanId);
-    expect(component.savedCalculations()).toEqual([]);
-    expect(component.historyFeedback()).toEqual(
-      expect.objectContaining({
-        kind: 'success',
-      }),
-    );
+    expect(component.result()).toBeNull();
+    expect(component.lastCalculatedPayload()).toBeNull();
+    expect(component.isInputModalOpen()).toBe(true);
+    expect(component.siteForm.controls.siteName.value).toBe('HQ Paris');
+    expect(component.siteForm.controls.energyMwh.value).toBe(10);
+    expect(component.siteForm.controls.employees.value).toBeNull();
+    expect(component.materials.length).toBe(1);
   });
 });

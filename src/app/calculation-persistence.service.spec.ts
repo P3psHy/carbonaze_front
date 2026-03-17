@@ -5,7 +5,7 @@ import { TestBed } from '@angular/core/testing';
 import { vi } from 'vitest';
 
 import { environment } from '../environment/environment';
-import { CalculationPersistenceService, SavedCalculationRecord } from './calculation-persistence.service';
+import { ApiBilanRecord, CalculationPersistenceService, SavedCalculationRecord } from './calculation-persistence.service';
 import { SiteImpactResult, SiteInputPayload } from './site-impact.models';
 
 describe('CalculationPersistenceService', () => {
@@ -224,19 +224,7 @@ describe('CalculationPersistenceService', () => {
   });
 
   it('retrieves all bilans from the API and caches the normalized history', () => {
-    let history: SavedCalculationRecord[] | undefined;
-    localStorage.setItem(
-      'carbonaze.backend.calculation-history',
-      JSON.stringify([
-        {
-          bilanId: 2,
-          siteId: 9,
-          siteName: 'Site cache',
-          totalCo2: 7.1,
-          calculationDate: '2026-03-14',
-        },
-      ]),
-    );
+    let history: ApiBilanRecord[] | undefined;
 
     service.getAllBilans().subscribe((value) => {
       history = value;
@@ -261,21 +249,18 @@ describe('CalculationPersistenceService', () => {
 
     expect(history).toEqual([
       {
-        bilanId: 3,
+        id: 3,
         siteId: 9,
-        siteName: 'Site cache',
         totalCo2: 8.4,
         calculationDate: '2026-03-17',
       },
       {
-        bilanId: 1,
-        siteId: 4,
-        siteName: 'Site Lyon',
+        id: 1,
+        site: { id: 4, name: 'Site Lyon' },
         totalCo2: 5.2,
         calculationDate: '2026-03-15',
       },
     ]);
-    expect(service.getSavedCalculationsHistory()).toEqual(history);
   });
 
   it('deletes a bilan from the API and removes it from the cached history', () => {
@@ -319,5 +304,33 @@ describe('CalculationPersistenceService', () => {
         calculationDate: '2026-03-15',
       },
     ]);
+  });
+
+  it('retrieves a single bilan by id from the API', () => {
+    let bilan: ApiBilanRecord | undefined;
+
+    service.getBilanById(55).subscribe((value) => {
+      bilan = value;
+    });
+
+    const request = httpTestingController.expectOne(`${environment.apiUrl}/bilans/55`);
+    expect(request.request.method).toBe('GET');
+    request.flush({
+      id: 55,
+      siteId: 21,
+      electricityKwhYear: 1234.6,
+      gasKwhYear: 456.2,
+      totalCo2: 9.7,
+      calculationDate: '2026-03-16',
+    });
+
+    expect(bilan).toEqual({
+      id: 55,
+      siteId: 21,
+      electricityKwhYear: 1234.6,
+      gasKwhYear: 456.2,
+      totalCo2: 9.7,
+      calculationDate: '2026-03-16',
+    });
   });
 });

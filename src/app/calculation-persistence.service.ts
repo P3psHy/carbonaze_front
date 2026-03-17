@@ -35,16 +35,24 @@ interface CreateBilanRequest {
   calculationDate: string;
 }
 
-interface BilanResponse {
+interface CreateBilanResponse {
   id: number;
+  totalCo2: number;
+  calculationDate: string;
+}
+
+export interface ApiBilanRecord {
+  id: number;
+  electricityKwhYear?: number;
+  gasKwhYear?: number;
   siteId?: number;
-  siteName?: string;
+  totalCo2?: number;
+  calculationDate?: string;
   site?: {
     id?: number;
     name?: string;
+    city?: string;
   };
-  totalCo2: number;
-  calculationDate: string;
 }
 
 export interface SavedCalculationRecord {
@@ -52,6 +60,17 @@ export interface SavedCalculationRecord {
   siteId: number;
   siteName: string;
   totalCo2: number;
+  calculationDate: string;
+}
+
+export interface LoadedBilanDraft {
+  bilanId: number;
+  siteId?: number;
+  siteName: string;
+  city: string;
+  energyMwh: number | null;
+  gasMwh: number | null;
+  totalCo2: number | null;
   calculationDate: string;
 }
 
@@ -71,7 +90,9 @@ export class CalculationPersistenceService {
     result: SiteImpactResult,
   ): Observable<SavedCalculationRecord> {
     return this.saveCalculationInternal(payload, result).pipe(
-      tap((savedRecord) => this.storeSavedCalculation(savedRecord)),
+      tap((savedRecord) => {
+        this.storeSavedCalculation(savedRecord);
+      }),
       catchError((error) => {
         if (!this.shouldResetCache(error)) {
           return throwError(() => error);
@@ -83,15 +104,14 @@ export class CalculationPersistenceService {
     );
   }
 
-  getAllBilans(): Observable<SavedCalculationRecord[]> {
-    return this.http.get<BilanResponse[]>(`${API_BASE_URL}/bilans`).pipe(
-      map((bilans) =>
-        [...bilans]
-          .map((bilan) => this.toSavedCalculationRecord(bilan))
-          .sort((left, right) => this.sortSavedCalculations(right, left)),
-      ),
-      tap((history) => this.writeSavedCalculationsHistory(history)),
+  getAllBilans(): Observable<ApiBilanRecord[]> {
+    return this.http.get<ApiBilanRecord[]>(`${API_BASE_URL}/bilans`).pipe(
+      map((bilans) => [...bilans].sort((left, right) => this.sortApiBilans(right, left))),
     );
+  }
+
+  getBilanById(bilanId: number): Observable<ApiBilanRecord> {
+    return this.http.get<ApiBilanRecord>(`${API_BASE_URL}/bilans/${bilanId}`);
   }
 
   deleteBilan(bilanId: number): Observable<void> {
@@ -128,7 +148,7 @@ export class CalculationPersistenceService {
       switchMap((societyId) => this.getOrCreateSite(payload, societyId)),
       switchMap((site) =>
         this.http
-          .post<BilanResponse>(
+          .post<CreateBilanResponse>(
             `${API_BASE_URL}/sites/${site.id}/bilans`,
             this.buildBilanRequest(payload, result),
           )
@@ -336,59 +356,17 @@ export class CalculationPersistenceService {
     }
   }
 
-  private toSavedCalculationRecord(bilan: BilanResponse): SavedCalculationRecord {
-    const siteId = this.resolveSiteId(bilan);
-
-    return {
-      bilanId: bilan.id,
-      siteId,
-      siteName: this.resolveSiteName(bilan, siteId),
-      totalCo2: bilan.totalCo2,
-      calculationDate: bilan.calculationDate,
-    };
-  }
-
-  private resolveSiteId(bilan: BilanResponse): number {
-    if (typeof bilan.siteId === 'number' && Number.isFinite(bilan.siteId)) {
-      return bilan.siteId;
-    }
-
-    if (typeof bilan.site?.id === 'number' && Number.isFinite(bilan.site.id)) {
-      return bilan.site.id;
-    }
-
-    return 0;
-  }
-
-  private resolveSiteName(bilan: BilanResponse, siteId: number): string {
-    if (typeof bilan.siteName === 'string' && bilan.siteName.trim()) {
-      return bilan.siteName.trim();
-    }
-
-    if (typeof bilan.site?.name === 'string' && bilan.site.name.trim()) {
-      return bilan.site.name.trim();
-    }
-
-    const cachedSiteName = this.getSavedCalculationsHistory().find((entry) => entry.siteId === siteId)?.siteName;
-
-    if (cachedSiteName) {
-      return cachedSiteName;
-    }
-
-    return siteId > 0 ? `Site #${siteId}` : 'Site inconnu';
-  }
-
-  private sortSavedCalculations(left: SavedCalculationRecord, right: SavedCalculationRecord): number {
-    const dateDifference =
-      new Date(left.calculationDate).getTime() - new Date(right.calculationDate).getTime();
+  private sortApiBilans(left: ApiBilanRecord, right: ApiBilanRecord): number {
+    const leftDate = left.calculationDate ? new Date(left.calculationDate).getTime() : 0;
+    const rightDate = right.calculationDate ? new Date(right.calculationDate).getTime() : 0;
+    const dateDifference = leftDate - rightDate;
 
     if (dateDifference !== 0) {
       return dateDifference;
     }
 
-    return left.bilanId - right.bilanId;
+    return left.id - right.id;
   }
-
   private isSavedCalculationRecord(value: unknown): value is SavedCalculationRecord {
     if (!value || typeof value !== 'object') {
       return false;
@@ -407,4 +385,5 @@ export class CalculationPersistenceService {
       typeof entry.calculationDate === 'string'
     );
   }
+
 }

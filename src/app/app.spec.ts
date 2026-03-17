@@ -28,6 +28,7 @@ describe('App', () => {
 
   afterEach(() => {
     httpTestingController.verify();
+    localStorage.clear();
   });
 
   it('should create the app', () => {
@@ -129,6 +130,80 @@ describe('App', () => {
     ) as HTMLInputElement[];
 
     expect(materialNameInputs.map((input) => input.value.trim())).toEqual(['Acier']);
+  });
+
+  it('should open the history modal from the topbar and render API bilans', async () => {
+    const fixture = TestBed.createComponent(App);
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const root = fixture.nativeElement as HTMLElement;
+    const historyButton = root.querySelector('[data-testid="history-button"]') as HTMLButtonElement | null;
+
+    expect(historyButton).toBeTruthy();
+
+    historyButton?.click();
+    fixture.detectChanges();
+
+    const historyRequest = httpTestingController.expectOne(`${environment.apiUrl}/bilans`);
+    expect(historyRequest.request.method).toBe('GET');
+    historyRequest.flush([
+      {
+        id: 7,
+        siteId: 3,
+        totalCo2: 12.4,
+        calculationDate: '2026-03-17',
+      },
+    ]);
+
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect(root.textContent).toContain('Bilan #7');
+    expect(root.textContent).toContain('12.4 tCO2e');
+  });
+
+  it('should navigate to calculations when loading a bilan from the API history', async () => {
+    const fixture = TestBed.createComponent(App);
+    const router = TestBed.inject(Router);
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const root = fixture.nativeElement as HTMLElement;
+    const historyButton = root.querySelector('[data-testid="history-button"]') as HTMLButtonElement | null;
+    historyButton?.click();
+    fixture.detectChanges();
+
+    httpTestingController.expectOne(`${environment.apiUrl}/bilans`).flush([
+      {
+        id: 7,
+        siteId: 3,
+        totalCo2: 12.4,
+        calculationDate: '2026-03-17',
+      },
+    ]);
+
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const historyCard = Array.from(root.querySelectorAll('.history-card-clickable')).at(0) as HTMLElement | undefined;
+    historyCard?.click();
+
+    const bilanRequest = httpTestingController.expectOne(`${environment.apiUrl}/bilans/7`);
+    expect(bilanRequest.request.method).toBe('GET');
+    bilanRequest.flush({
+      id: 7,
+      siteId: 3,
+      electricityKwhYear: 10000,
+      gasKwhYear: 2000,
+      totalCo2: 12.4,
+      calculationDate: '2026-03-17',
+    });
+
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect(router.url).toBe('/calculs');
   });
 
   it('should open the input modal and show results after calculation', async () => {
