@@ -21,6 +21,7 @@ import {
 } from '@angular/forms';
 import { finalize } from 'rxjs';
 
+import { environment } from '../../environment/environment';
 import {
   CalculationPersistenceService,
   SavedCalculationRecord,
@@ -41,6 +42,11 @@ type MaterialFormGroup = FormGroup<{
 
 type SaveFeedback = {
   kind: 'success' | 'error';
+  message: string;
+};
+
+type HistoryFeedback = {
+  kind: 'error' | 'success';
   message: string;
 };
 
@@ -76,8 +82,13 @@ export class CalculationsPageComponent {
   protected readonly lastCalculatedPayload = signal<SiteInputPayload | null>(null);
   protected readonly submitAttempted = signal(false);
   protected readonly isInputModalOpen = signal(false);
+  protected readonly isHistoryModalOpen = signal(false);
   protected readonly isSavingCalculation = signal(false);
+  protected readonly isHistoryLoading = signal(false);
   protected readonly saveFeedback = signal<SaveFeedback | null>(null);
+  protected readonly historyFeedback = signal<HistoryFeedback | null>(null);
+  protected readonly savedCalculations = signal<SavedCalculationRecord[]>([]);
+  protected readonly deletingBilanIds = signal<number[]>([]);
   protected readonly configuredMaterials = this.calculatorSettingsService.configuredMaterials;
 
   protected readonly categoryChart = computed(() => {
@@ -119,19 +130,19 @@ export class CalculationsPageComponent {
   protected readonly materialFactorCards = computed(() => this.configuredMaterials());
 
   constructor() {
-    let inputModalWasOpen = false;
+    let modalLockActive = false;
     let previousConfiguredMaterials = this.configuredMaterials();
 
     effect(() => {
-      const isOpen = this.isInputModalOpen();
+      const shouldLockBody = this.isInputModalOpen() || this.isHistoryModalOpen();
 
-      if (isOpen === inputModalWasOpen) {
+      if (shouldLockBody === modalLockActive) {
         return;
       }
 
-      inputModalWasOpen = isOpen;
+      modalLockActive = shouldLockBody;
 
-      if (isOpen) {
+      if (shouldLockBody) {
         this.bodyScrollLockService.lock();
         return;
       }
@@ -161,7 +172,7 @@ export class CalculationsPageComponent {
     });
 
     this.destroyRef.onDestroy(() => {
-      if (inputModalWasOpen) {
+      if (modalLockActive) {
         this.bodyScrollLockService.unlock();
       }
     });
@@ -170,6 +181,11 @@ export class CalculationsPageComponent {
   @HostListener('document:keydown.escape')
   protected handleEscape(): void {
     if (this.calculatorSettingsService.isSettingsOpen()) {
+      return;
+    }
+
+    if (this.isHistoryModalOpen()) {
+      this.closeHistoryModal();
       return;
     }
 
@@ -186,6 +202,16 @@ export class CalculationsPageComponent {
     this.submitAttempted.set(false);
     this.siteForm.markAsUntouched();
     this.isInputModalOpen.set(true);
+  }
+
+  protected openHistoryModal(): void {
+    this.isHistoryModalOpen.set(true);
+    this.loadSavedCalculations();
+  }
+
+  protected closeHistoryModal(): void {
+    this.isHistoryModalOpen.set(false);
+    this.historyFeedback.set(null);
   }
 
   protected closeInputModal(): void {
@@ -269,6 +295,10 @@ export class CalculationsPageComponent {
       .pipe(finalize(() => this.isSavingCalculation.set(false)))
       .subscribe({
         next: (savedCalculation) => {
+          this.savedCalculations.update((history) => [
+            savedCalculation,
+            ...history.filter((entry) => entry.bilanId !== savedCalculation.bilanId),
+          ]);
           this.saveFeedback.set({
             kind: 'success',
             message: this.buildSuccessMessage(savedCalculation),
@@ -277,8 +307,43 @@ export class CalculationsPageComponent {
         error: () => {
           this.saveFeedback.set({
             kind: 'error',
-            message:
-              "Impossible de sauvegarder le calcul. Vérifiez que le backend Carbonaze tourne sur http://localhost:8080.",
+            message: `Impossible de sauvegarder le calcul. Verifiez que le backend Carbonaze repond sur ${environment.apiUrl}.`,
+          });
+        },
+      });
+  }
+
+  protected isDeletingBilan(bilanId: number): boolean {
+    return this.deletingBilanIds().includes(bilanId);
+  }
+
+  protected deleteSavedCalculation(bilanId: number): void {
+    if (this.isDeletingBilan(bilanId)) {
+      return;
+    }
+
+    this.deletingBilanIds.update((ids) => [...ids, bilanId]);
+    this.historyFeedback.set(null);
+
+    this.calculationPersistenceService
+      .deleteBilan(bilanId)
+      .pipe(
+        finalize(() => {
+          this.deletingBilanIds.update((ids) => ids.filter((id) => id !== bilanId));
+        }),
+      )
+      .subscribe({
+        next: () => {
+          this.savedCalculations.update((history) => history.filter((entry) => entry.bilanId !== bilanId));
+          this.historyFeedback.set({
+            kind: 'success',
+            message: "Calcul supprime de l'historique.",
+          });
+        },
+        error: () => {
+          this.historyFeedback.set({
+            kind: 'error',
+            message: `Impossible de supprimer ce calcul. Verifiez que le backend Carbonaze repond sur ${environment.apiUrl}.`,
           });
         },
       });
@@ -314,7 +379,28 @@ export class CalculationsPageComponent {
   }
 
   private buildSuccessMessage(savedCalculation: SavedCalculationRecord): string {
-    return `Calcul sauvegardé le ${this.formatIsoDate(savedCalculation.calculationDate)} pour ${savedCalculation.siteName}.`;
+    return `Calcul sauvegarde le ${this.formatIsoDate(savedCalculation.calculationDate)} pour ${savedCalculation.siteName}.`;
+  }
+
+  private loadSavedCalculations(): void {
+    this.isHistoryLoading.set(true);
+    this.historyFeedback.set(null);
+
+    this.calculationPersistenceService
+      .getAllBilans()
+      .pipe(finalize(() => this.isHistoryLoading.set(false)))
+      .subscribe({
+        next: (history) => {
+          this.savedCalculations.set(history);
+        },
+        error: () => {
+          this.savedCalculations.set([]);
+          this.historyFeedback.set({
+            kind: 'error',
+            message: `Impossible de charger l'historique. Verifiez que le backend Carbonaze repond sur ${environment.apiUrl}.`,
+          });
+        },
+      });
   }
 
   private createMaterial(materialId = '', quantity: number | null = null): MaterialFormGroup {

@@ -31,12 +31,10 @@
               Accueil
             </a>
             <a class="nav-pill" [routerLink]="['/calculs']" routerLinkActive="nav-pill-active">Calculs</a>
+            <button class="nav-pill nav-pill-button" type="button" (click)="openHistoryModal()">
+              Historique
+            </button>
           </nav>
-
-          <div class="status-chip">
-            <span class="status-dot"></span>
-            Pilotage carbone
-          </div>
         </div>
       </div>
     </div>
@@ -46,5 +44,91 @@
 <div class="app-content">
   <router-outlet></router-outlet>
 </div>
+
+@if (isHistoryModalOpen()) {
+  <div class="modal-backdrop" (click)="closeHistoryModal()">
+    <div
+      class="modal-dialog panel"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="global-history-modal-title"
+      (click)="$event.stopPropagation()"
+    >
+      <div class="modal-header">
+        <div>
+          <p class="eyebrow">Historique</p>
+          <h2
+            class="font-heading mt-3 text-3xl font-semibold tracking-[-0.04em] text-[var(--ink)]"
+            id="global-history-modal-title"
+          >
+            Tous les calculs sauvegardes
+          </h2>
+          <p class="mt-3 max-w-[680px] text-sm leading-7 text-[var(--muted)]">
+            Consultez les bilans enregistres par l'API et supprimez ceux qui ne sont plus utiles.
+          </p>
+        </div>
+
+        <button class="modal-close" type="button" (click)="closeHistoryModal()" aria-label="Fermer l'historique">
+          Fermer
+        </button>
+      </div>
+
+      <div class="modal-body mt-6">
+        @if (historyFeedback(); as feedback) {
+          <p class="mb-4 text-sm leading-7" [style.color]="feedback.kind === 'success' ? 'var(--moss)' : '#9a3412'">
+            {{ feedback.message }}
+          </p>
+        }
+
+        @if (isHistoryLoading()) {
+          <div class="history-empty-state">
+            <p class="font-heading text-xl font-semibold text-[var(--ink)]">Chargement de l'historique...</p>
+          </div>
+        } @else if (savedCalculations().length === 0) {
+          <div class="history-empty-state">
+            <p class="font-heading text-xl font-semibold text-[var(--ink)]">Aucun calcul sauvegarde</p>
+            <p class="mt-2 text-sm leading-7 text-[var(--muted)]">
+              Sauvegardez un calcul pour le retrouver ici.
+            </p>
+          </div>
+        } @else {
+          <div class="history-list">
+            @for (savedCalculation of savedCalculations(); track savedCalculation.bilanId) {
+              <article class="history-card">
+                <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                  <div class="min-w-0">
+                    <p class="history-card-title">{{ savedCalculation.siteName }}</p>
+                    <p class="history-card-meta">
+                      Bilan #{{ savedCalculation.bilanId }} • Site #{{ savedCalculation.siteId }}
+                    </p>
+                  </div>
+
+                  <div class="history-metrics">
+                    <div class="history-metric">
+                      <span>Date</span>
+                      <strong>{{ savedCalculation.calculationDate }}</strong>
+                    </div>
+                    <div class="history-metric">
+                      <span>Total</span>
+                      <strong>{{ savedCalculation.totalCo2 | number:'1.0-1' }} tCO2e</strong>
+                    </div>
+                    <button
+                      class="history-delete-button"
+                      type="button"
+                      [disabled]="isDeletingBilan(savedCalculation.bilanId)"
+                      (click)="deleteSavedCalculation(savedCalculation.bilanId)"
+                    >
+                      {{ isDeletingBilan(savedCalculation.bilanId) ? 'Suppression...' : 'Supprimer' }}
+                    </button>
+                  </div>
+                </div>
+              </article>
+            }
+          </div>
+        }
+      </div>
+    </div>
+  </div>
+}
 
 <app-calculator-settings-button></app-calculator-settings-button>

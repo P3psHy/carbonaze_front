@@ -12,6 +12,14 @@
   cursor: pointer;
 }
 
+.nav-pill-button {
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
 .app-topbar-shell {
   position: fixed;
   inset: 0 0 auto;

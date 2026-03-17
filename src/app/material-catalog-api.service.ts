@@ -2,6 +2,7 @@ import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { map, Observable } from 'rxjs';
 
+import { environment } from '../environment/environment';
 import { ConfiguredMaterial } from './site-impact.models';
 
 interface MaterialResponse {
@@ -18,7 +19,7 @@ interface SaveMaterialRequest {
   quantity: number;
 }
 
-const API_BASE_URL = '/api';
+const API_BASE_URL = environment.apiUrl;
 
 @Injectable({ providedIn: 'root' })
 export class MaterialCatalogApiService {

@@ -6,6 +6,7 @@ import { catchError, finalize, map, Observable, of, tap, throwError } from 'rxjs
 import { MaterialCatalogApiService } from './material-catalog-api.service';
 import { ConfiguredMaterial } from './site-impact.models';
 import { SiteImpactService } from './site-impact.service';
+import { environment } from '../environment/environment';
 
 type OpenSettingsOptions = {
   focusNewMaterial?: boolean;
@@ -186,11 +187,11 @@ export class CalculatorSettingsService {
   private toSyncErrorMessage(error: unknown): string {
     if (error instanceof HttpErrorResponse) {
       if (error.status === 404) {
-        return "La route /api/materials n'est pas disponible sur le backend.";
+        return `La route ${environment.apiUrl}/materials n'est pas disponible sur le backend.`;
       }
 
       if (error.status === 0) {
-        return 'Le backend Carbonaze est inaccessible pour synchroniser les materiaux.';
+        return `Le backend Carbonaze est inaccessible pour synchroniser les materiaux via ${environment.apiUrl}.`;
       }
     }
 

@@ -1,7 +1,8 @@
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
-import { Observable, catchError, map, of, switchMap, throwError } from 'rxjs';
+import { Observable, catchError, map, of, switchMap, tap, throwError } from 'rxjs';
 
+import { environment } from '../environment/environment';
 import { SiteImpactResult, SiteInputPayload } from './site-impact.models';
 
 interface CreateSocietyRequest {
@@ -36,6 +37,12 @@ interface CreateBilanRequest {
 
 interface BilanResponse {
   id: number;
+  siteId?: number;
+  siteName?: string;
+  site?: {
+    id?: number;
+    name?: string;
+  };
   totalCo2: number;
   calculationDate: string;
 }
@@ -48,10 +55,12 @@ export interface SavedCalculationRecord {
   calculationDate: string;
 }
 
-const API_BASE_URL = '/api';
+const API_BASE_URL = environment.apiUrl;
 const DEFAULT_SOCIETY_NAME = 'Carbonaze Front';
 const SOCIETY_STORAGE_KEY = 'carbonaze.backend.society';
 const SITE_STORAGE_KEY = 'carbonaze.backend.sites';
+const HISTORY_STORAGE_KEY = 'carbonaze.backend.calculation-history';
+const MAX_HISTORY_ENTRIES = 50;
 
 @Injectable({ providedIn: 'root' })
 export class CalculationPersistenceService {
@@ -62,6 +71,7 @@ export class CalculationPersistenceService {
     result: SiteImpactResult,
   ): Observable<SavedCalculationRecord> {
     return this.saveCalculationInternal(payload, result).pipe(
+      tap((savedRecord) => this.storeSavedCalculation(savedRecord)),
       catchError((error) => {
         if (!this.shouldResetCache(error)) {
           return throwError(() => error);
@@ -71,6 +81,43 @@ export class CalculationPersistenceService {
         return this.saveCalculationInternal(payload, result);
       }),
     );
+  }
+
+  getAllBilans(): Observable<SavedCalculationRecord[]> {
+    return this.http.get<BilanResponse[]>(`${API_BASE_URL}/bilans`).pipe(
+      map((bilans) =>
+        [...bilans]
+          .map((bilan) => this.toSavedCalculationRecord(bilan))
+          .sort((left, right) => this.sortSavedCalculations(right, left)),
+      ),
+      tap((history) => this.writeSavedCalculationsHistory(history)),
+    );
+  }
+
+  deleteBilan(bilanId: number): Observable<void> {
+    return this.http.delete<void>(`${API_BASE_URL}/bilans/${bilanId}`).pipe(
+      tap(() => this.removeSavedCalculation(bilanId)),
+    );
+  }
+
+  getSavedCalculationsHistory(): SavedCalculationRecord[] {
+    try {
+      const rawValue = globalThis.localStorage?.getItem(HISTORY_STORAGE_KEY);
+
+      if (!rawValue) {
+        return [];
+      }
+
+      const parsedValue = JSON.parse(rawValue) as SavedCalculationRecord[];
+
+      if (!Array.isArray(parsedValue)) {
+        return [];
+      }
+
+      return parsedValue.filter((entry) => this.isSavedCalculationRecord(entry));
+    } catch {
+      return [];
+    }
   }
 
   private saveCalculationInternal(
@@ -254,5 +301,110 @@ export class CalculationPersistenceService {
     } catch {
       return;
     }
+  }
+
+  private storeSavedCalculation(savedRecord: SavedCalculationRecord): void {
+    try {
+      const history = this.getSavedCalculationsHistory().filter(
+        (entry) => entry.bilanId !== savedRecord.bilanId,
+      );
+
+      history.unshift(savedRecord);
+      this.writeSavedCalculationsHistory(history);
+    } catch {
+      return;
+    }
+  }
+
+  private removeSavedCalculation(bilanId: number): void {
+    try {
+      const history = this.getSavedCalculationsHistory().filter((entry) => entry.bilanId !== bilanId);
+      this.writeSavedCalculationsHistory(history);
+    } catch {
+      return;
+    }
+  }
+
+  private writeSavedCalculationsHistory(history: SavedCalculationRecord[]): void {
+    try {
+      globalThis.localStorage?.setItem(
+        HISTORY_STORAGE_KEY,
+        JSON.stringify(history.slice(0, MAX_HISTORY_ENTRIES)),
+      );
+    } catch {
+      return;
+    }
+  }
+
+  private toSavedCalculationRecord(bilan: BilanResponse): SavedCalculationRecord {
+    const siteId = this.resolveSiteId(bilan);
+
+    return {
+      bilanId: bilan.id,
+      siteId,
+      siteName: this.resolveSiteName(bilan, siteId),
+      totalCo2: bilan.totalCo2,
+      calculationDate: bilan.calculationDate,
+    };
+  }
+
+  private resolveSiteId(bilan: BilanResponse): number {
+    if (typeof bilan.siteId === 'number' && Number.isFinite(bilan.siteId)) {
+      return bilan.siteId;
+    }
+
+    if (typeof bilan.site?.id === 'number' && Number.isFinite(bilan.site.id)) {
+      return bilan.site.id;
+    }
+
+    return 0;
+  }
+
+  private resolveSiteName(bilan: BilanResponse, siteId: number): string {
+    if (typeof bilan.siteName === 'string' && bilan.siteName.trim()) {
+      return bilan.siteName.trim();
+    }
+
+    if (typeof bilan.site?.name === 'string' && bilan.site.name.trim()) {
+      return bilan.site.name.trim();
+    }
+
+    const cachedSiteName = this.getSavedCalculationsHistory().find((entry) => entry.siteId === siteId)?.siteName;
+
+    if (cachedSiteName) {
+      return cachedSiteName;
+    }
+
+    return siteId > 0 ? `Site #${siteId}` : 'Site inconnu';
+  }
+
+  private sortSavedCalculations(left: SavedCalculationRecord, right: SavedCalculationRecord): number {
+    const dateDifference =
+      new Date(left.calculationDate).getTime() - new Date(right.calculationDate).getTime();
+
+    if (dateDifference !== 0) {
+      return dateDifference;
+    }
+
+    return left.bilanId - right.bilanId;
+  }
+
+  private isSavedCalculationRecord(value: unknown): value is SavedCalculationRecord {
+    if (!value || typeof value !== 'object') {
+      return false;
+    }
+
+    const entry = value as Partial<SavedCalculationRecord>;
+
+    return (
+      typeof entry.bilanId === 'number' &&
+      Number.isFinite(entry.bilanId) &&
+      typeof entry.siteId === 'number' &&
+      Number.isFinite(entry.siteId) &&
+      typeof entry.siteName === 'string' &&
+      typeof entry.totalCo2 === 'number' &&
+      Number.isFinite(entry.totalCo2) &&
+      typeof entry.calculationDate === 'string'
+    );
   }
 }

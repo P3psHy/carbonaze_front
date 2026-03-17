@@ -1,7 +1,0 @@
-// src/environments/environment.prod.ts
-// ⚠️  Remplace l'URL par celle affichée par setup-frontend.sh
-
-export const environment = {
-  production: true,
-  apiUrl: 'https://carbonaze-backend.<ton-id>.francecentral.azurecontainerapps.io'
-};

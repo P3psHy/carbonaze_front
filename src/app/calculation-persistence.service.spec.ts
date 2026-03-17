@@ -4,6 +4,7 @@ import { HttpTestingController, provideHttpClientTesting } from '@angular/common
 import { TestBed } from '@angular/core/testing';
 import { vi } from 'vitest';
 
+import { environment } from '../environment/environment';
 import { CalculationPersistenceService, SavedCalculationRecord } from './calculation-persistence.service';
 import { SiteImpactResult, SiteInputPayload } from './site-impact.models';
 
@@ -61,12 +62,12 @@ describe('CalculationPersistenceService', () => {
       savedRecord = value;
     });
 
-    const societyRequest = httpTestingController.expectOne('/api/societies');
+    const societyRequest = httpTestingController.expectOne(`${environment.apiUrl}/societies`);
     expect(societyRequest.request.method).toBe('POST');
     expect(societyRequest.request.body).toEqual({ name: 'Carbonaze Front' });
     societyRequest.flush({ id: 9, name: 'Carbonaze Front' });
 
-    const siteRequest = httpTestingController.expectOne('/api/sites');
+    const siteRequest = httpTestingController.expectOne(`${environment.apiUrl}/sites`);
     expect(siteRequest.request.method).toBe('POST');
     expect(siteRequest.request.body).toEqual({
       name: 'HQ Paris',
@@ -78,7 +79,7 @@ describe('CalculationPersistenceService', () => {
     });
     siteRequest.flush({ id: 21, name: 'HQ Paris' });
 
-    const bilanRequest = httpTestingController.expectOne('/api/sites/21/bilans');
+    const bilanRequest = httpTestingController.expectOne(`${environment.apiUrl}/sites/21/bilans`);
     expect(bilanRequest.request.method).toBe('POST');
     expect(bilanRequest.request.body).toEqual({
       electricityKwhYear: 1234.6,
@@ -125,7 +126,7 @@ describe('CalculationPersistenceService', () => {
       savedRecord = value;
     });
 
-    const bilanRequest = httpTestingController.expectOne('/api/sites/21/bilans');
+    const bilanRequest = httpTestingController.expectOne(`${environment.apiUrl}/sites/21/bilans`);
     expect(bilanRequest.request.body.calculationDate).toBe('2026-03-16');
     bilanRequest.flush({
       id: 56,
@@ -164,19 +165,19 @@ describe('CalculationPersistenceService', () => {
       savedRecord = value;
     });
 
-    const failedBilanRequest = httpTestingController.expectOne('/api/sites/21/bilans');
+    const failedBilanRequest = httpTestingController.expectOne(`${environment.apiUrl}/sites/21/bilans`);
     failedBilanRequest.flush('missing', {
       status: 404,
       statusText: 'Not Found',
     });
 
-    const societyRequest = httpTestingController.expectOne('/api/societies');
+    const societyRequest = httpTestingController.expectOne(`${environment.apiUrl}/societies`);
     societyRequest.flush({ id: 18, name: 'Carbonaze Front' });
 
-    const siteRequest = httpTestingController.expectOne('/api/sites');
+    const siteRequest = httpTestingController.expectOne(`${environment.apiUrl}/sites`);
     siteRequest.flush({ id: 32, name: 'HQ Paris' });
 
-    const bilanRequest = httpTestingController.expectOne('/api/sites/32/bilans');
+    const bilanRequest = httpTestingController.expectOne(`${environment.apiUrl}/sites/32/bilans`);
     bilanRequest.flush({
       id: 77,
       totalCo2: 9.7,
@@ -212,7 +213,7 @@ describe('CalculationPersistenceService', () => {
       },
     });
 
-    const bilanRequest = httpTestingController.expectOne('/api/sites/21/bilans');
+    const bilanRequest = httpTestingController.expectOne(`${environment.apiUrl}/sites/21/bilans`);
     bilanRequest.flush('server error', {
       status: 500,
       statusText: 'Server Error',
@@ -220,5 +221,103 @@ describe('CalculationPersistenceService', () => {
 
     expect(thrownError).toBeInstanceOf(HttpErrorResponse);
     expect(localStorage.getItem('carbonaze.backend.society')).toBe('9');
+  });
+
+  it('retrieves all bilans from the API and caches the normalized history', () => {
+    let history: SavedCalculationRecord[] | undefined;
+    localStorage.setItem(
+      'carbonaze.backend.calculation-history',
+      JSON.stringify([
+        {
+          bilanId: 2,
+          siteId: 9,
+          siteName: 'Site cache',
+          totalCo2: 7.1,
+          calculationDate: '2026-03-14',
+        },
+      ]),
+    );
+
+    service.getAllBilans().subscribe((value) => {
+      history = value;
+    });
+
+    const request = httpTestingController.expectOne(`${environment.apiUrl}/bilans`);
+    expect(request.request.method).toBe('GET');
+    request.flush([
+      {
+        id: 3,
+        siteId: 9,
+        totalCo2: 8.4,
+        calculationDate: '2026-03-17',
+      },
+      {
+        id: 1,
+        site: { id: 4, name: 'Site Lyon' },
+        totalCo2: 5.2,
+        calculationDate: '2026-03-15',
+      },
+    ]);
+
+    expect(history).toEqual([
+      {
+        bilanId: 3,
+        siteId: 9,
+        siteName: 'Site cache',
+        totalCo2: 8.4,
+        calculationDate: '2026-03-17',
+      },
+      {
+        bilanId: 1,
+        siteId: 4,
+        siteName: 'Site Lyon',
+        totalCo2: 5.2,
+        calculationDate: '2026-03-15',
+      },
+    ]);
+    expect(service.getSavedCalculationsHistory()).toEqual(history);
+  });
+
+  it('deletes a bilan from the API and removes it from the cached history', () => {
+    localStorage.setItem(
+      'carbonaze.backend.calculation-history',
+      JSON.stringify([
+        {
+          bilanId: 3,
+          siteId: 9,
+          siteName: 'Site cache',
+          totalCo2: 8.4,
+          calculationDate: '2026-03-17',
+        },
+        {
+          bilanId: 1,
+          siteId: 4,
+          siteName: 'Site Lyon',
+          totalCo2: 5.2,
+          calculationDate: '2026-03-15',
+        },
+      ]),
+    );
+
+    let completed = false;
+
+    service.deleteBilan(3).subscribe(() => {
+      completed = true;
+    });
+
+    const request = httpTestingController.expectOne(`${environment.apiUrl}/bilans/3`);
+    expect(request.request.method).toBe('DELETE');
+    request.flush(null, { status: 204, statusText: 'No Content' });
+
+    expect(completed).toBe(true);
+    expect(service.getSavedCalculationsHistory()).toEqual([
+      {
+        bilanId: 1,
+        siteId: 4,
+        siteName: 'Site Lyon',
+        totalCo2: 5.2,
+        calculationDate: '2026-03-15',
+      },
+    ]);
   });
 });

@@ -8,6 +8,7 @@ import { vi } from 'vitest';
 
 import { App } from './app';
 import { routes } from './app.routes';
+import { environment } from '../environment/environment';
 
 describe('App', () => {
   let httpTestingController: HttpTestingController;
@@ -74,7 +75,7 @@ describe('App', () => {
 
     settingsButton.click();
     fixture.detectChanges();
-    httpTestingController.expectOne('/api/materials').flush([
+    httpTestingController.expectOne(`${environment.apiUrl}/materials`).flush([
       { id: 1, name: 'Béton', energeticValue: 0.18, quantity: 0 },
       { id: 2, name: 'Acier', energeticValue: 1.9, quantity: 0 },
     ]);
@@ -98,7 +99,7 @@ describe('App', () => {
     expect(settingsButton).toBeTruthy();
     settingsButton?.click();
     fixture.detectChanges();
-    httpTestingController.expectOne('/api/materials').flush([
+    httpTestingController.expectOne(`${environment.apiUrl}/materials`).flush([
       { id: 1, name: 'Béton', energeticValue: 0.18, quantity: 0 },
       { id: 2, name: 'Acier', energeticValue: 1.9, quantity: 0 },
       { id: 3, name: 'Bois', energeticValue: 0.08, quantity: 0 },
@@ -164,7 +165,7 @@ describe('App', () => {
 
     openNewMaterialSettingsButton?.click();
     fixture.detectChanges();
-    httpTestingController.expectOne('/api/materials').flush([
+    httpTestingController.expectOne(`${environment.apiUrl}/materials`).flush([
       { id: 1, name: 'Béton', energeticValue: 0.18, quantity: 0 },
       { id: 2, name: 'Acier', energeticValue: 1.9, quantity: 0 },
     ]);
@@ -196,7 +197,7 @@ describe('App', () => {
     factorInput.dispatchEvent(new Event('input'));
     addMaterialButton.click();
     fixture.detectChanges();
-    httpTestingController.expectOne('/api/materials').flush([
+    httpTestingController.expectOne(`${environment.apiUrl}/materials`).flush([
       { id: 3, name: 'Pierre', energeticValue: 0.44, quantity: 0 },
     ]);
 

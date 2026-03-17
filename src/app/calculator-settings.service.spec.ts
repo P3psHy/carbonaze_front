@@ -7,6 +7,7 @@ import { CalculatorSettingsService } from './calculator-settings.service';
 import { MaterialCatalogApiService } from './material-catalog-api.service';
 import { ConfiguredMaterial } from './site-impact.models';
 import { SiteImpactService } from './site-impact.service';
+import { environment } from '../environment/environment';
 
 describe('CalculatorSettingsService', () => {
   const storageKey = 'carbonaze.material-catalog.v2';
@@ -160,7 +161,7 @@ describe('CalculatorSettingsService', () => {
     });
 
     expect(refreshedMaterials).toEqual(existingMaterials);
-    expect(service.materialsSyncError()).toContain('/api/materials');
+    expect(service.materialsSyncError()).toContain(`${environment.apiUrl}/materials`);
     expect(service.isSyncingMaterials()).toBe(false);
   });
 

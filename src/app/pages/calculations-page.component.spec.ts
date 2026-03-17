@@ -8,6 +8,7 @@ import { vi } from 'vitest';
 import { BodyScrollLockService } from '../body-scroll-lock.service';
 import { CalculationPersistenceService } from '../calculation-persistence.service';
 import { CalculatorSettingsService } from '../calculator-settings.service';
+import { environment } from '../../environment/environment';
 import { SiteImpactResult, SiteInputPayload } from '../site-impact.models';
 import { SiteImpactService } from '../site-impact.service';
 import { CalculationsPageComponent } from './calculations-page.component';
@@ -90,7 +91,11 @@ describe('CalculationsPageComponent', () => {
   };
 
   let siteImpactService: { calculateImpact: ReturnType<typeof vi.fn> };
-  let calculationPersistenceService: { saveCalculation: ReturnType<typeof vi.fn> };
+  let calculationPersistenceService: {
+    saveCalculation: ReturnType<typeof vi.fn>;
+    getAllBilans: ReturnType<typeof vi.fn>;
+    deleteBilan: ReturnType<typeof vi.fn>;
+  };
   let bodyScrollLockService: { lock: ReturnType<typeof vi.fn>; unlock: ReturnType<typeof vi.fn> };
   let calculatorSettingsService: {
     configuredMaterials: typeof configuredMaterials;
@@ -111,6 +116,8 @@ describe('CalculationsPageComponent', () => {
     };
     calculationPersistenceService = {
       saveCalculation: vi.fn(() => of(savedCalculation)),
+      getAllBilans: vi.fn(() => of([savedCalculation])),
+      deleteBilan: vi.fn(() => of(void 0)),
     };
     bodyScrollLockService = {
       lock: vi.fn(),
@@ -272,7 +279,7 @@ describe('CalculationsPageComponent', () => {
     expect(component.saveFeedback()).toEqual(
       expect.objectContaining({
         kind: 'error',
-        message: expect.stringContaining('http://localhost:8080'),
+        message: expect.stringContaining(environment.apiUrl),
       }),
     );
   });
@@ -286,5 +293,33 @@ describe('CalculationsPageComponent', () => {
 
     expect(calculatorSettingsService.openSettings).toHaveBeenCalledWith({ focusNewMaterial: true });
     expect(component.siteForm.controls.employees.value).toBe(1);
+  });
+
+  it('loads the saved calculations history when opening the history modal', () => {
+    const fixture = TestBed.createComponent(CalculationsPageComponent);
+    const component = fixture.componentInstance as any;
+
+    component.openHistoryModal();
+
+    expect(component.isHistoryModalOpen()).toBe(true);
+    expect(calculationPersistenceService.getAllBilans).toHaveBeenCalledTimes(1);
+    expect(component.savedCalculations()).toEqual([savedCalculation]);
+  });
+
+  it('deletes a saved calculation from the history modal', () => {
+    const fixture = TestBed.createComponent(CalculationsPageComponent);
+    const component = fixture.componentInstance as any;
+
+    component.savedCalculations.set([savedCalculation]);
+
+    component.deleteSavedCalculation(savedCalculation.bilanId);
+
+    expect(calculationPersistenceService.deleteBilan).toHaveBeenCalledWith(savedCalculation.bilanId);
+    expect(component.savedCalculations()).toEqual([]);
+    expect(component.historyFeedback()).toEqual(
+      expect.objectContaining({
+        kind: 'success',
+      }),
+    );
   });
 });

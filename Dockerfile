@@ -22,7 +22,7 @@ COPY nginx.conf /etc/nginx/conf.d/default.conf
 
 # Copie les fichiers buildés
 # Angular CLI v21 sort dans dist/<nom-projet>/browser/
-COPY --from=build /app/dist/carbonaze-front/browser /usr/share/nginx/html
+COPY --from=build /app/dist/carbonaze_frontend/browser /usr/share/nginx/html
 
 EXPOSE 80
 

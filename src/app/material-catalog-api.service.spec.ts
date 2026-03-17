@@ -2,6 +2,7 @@ import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
 
+import { environment } from '../environment/environment';
 import { MaterialCatalogApiService } from './material-catalog-api.service';
 import { ConfiguredMaterial } from './site-impact.models';
 
@@ -29,7 +30,7 @@ describe('MaterialCatalogApiService', () => {
       materials = value;
     });
 
-    const request = httpTestingController.expectOne('/api/materials');
+    const request = httpTestingController.expectOne(`${environment.apiUrl}/materials`);
     expect(request.request.method).toBe('GET');
     request.flush([
       { id: 4, name: '  Pierre  ', energeticValue: 0.444, quantity: 12 },
@@ -56,7 +57,7 @@ describe('MaterialCatalogApiService', () => {
         createdMaterial = value;
       });
 
-    const request = httpTestingController.expectOne('/api/materials');
+    const request = httpTestingController.expectOne(`${environment.apiUrl}/materials`);
     expect(request.request.method).toBe('POST');
     expect(request.request.body).toEqual([
       {
@@ -92,7 +93,7 @@ describe('MaterialCatalogApiService', () => {
         },
       });
 
-    const request = httpTestingController.expectOne('/api/materials');
+    const request = httpTestingController.expectOne(`${environment.apiUrl}/materials`);
     request.flush([]);
 
     expect(thrownError).toBeInstanceOf(Error);
