@@ -25,12 +25,30 @@ interface CreateBilanRequest {
   gasKwhYear: number;
   totalCo2: number;
   calculationDate: string;
+  materials: CreateBilanMaterialRequest[];
 }
 
 interface CreateBilanResponse {
   id: number;
   totalCo2: number;
   calculationDate: string;
+}
+
+interface CreateBilanMaterialRequest {
+  materialId?: number;
+  name: string;
+  quantity: number;
+  factor: number;
+  emission: number;
+}
+
+export interface ApiBilanMaterialRecord {
+  id?: number;
+  materialId?: number;
+  name?: string;
+  quantity?: number;
+  factor?: number;
+  emission?: number;
 }
 
 export interface ApiBilanRecord {
@@ -40,6 +58,7 @@ export interface ApiBilanRecord {
   siteId?: number;
   totalCo2?: number;
   calculationDate?: string;
+  materials?: ApiBilanMaterialRecord[];
   site?: {
     id?: number;
     name?: string;
@@ -85,6 +104,7 @@ export interface LoadedBilanDraft {
   employees?: number | null;
   parkingSpaces?: number | null;
   computers?: number | null;
+  materials?: ApiBilanMaterialRecord[];
   totalCo2: number | null;
   calculationDate: string;
 }
@@ -206,14 +226,13 @@ export class CalculationPersistenceService {
       });
     }
 
-    return this.http
-      .post<SiteResponse>(`${API_BASE_URL}/sites`, this.buildSiteRequest(payload, societyId))
-      .pipe(
-        map((response) => {
-          this.writeCachedSiteId(cacheKey, response.id);
-          return response;
-        }),
-      );
+    return this.http.post<SiteResponse>(`${API_BASE_URL}/sites`, this.buildSiteRequest(payload, societyId)).pipe(
+      map((response) => {
+        this.writeCachedSiteId(cacheKey, response.id);
+        return response;
+      }),
+      catchError((error) => this.resolveExistingSiteFromApi(error, payload, societyId, cacheKey)),
+    );
   }
 
   private buildSiteRequest(payload: SiteInputPayload, societyId: number): CreateSiteRequest {
@@ -236,6 +255,12 @@ export class CalculationPersistenceService {
       gasKwhYear: this.round(payload.gasMwh * 1000, 1),
       totalCo2: this.round(result.totalEmission, 1),
       calculationDate: this.getTodayIsoDate(),
+      materials: result.materials.map((material) => ({
+        name: material.name.trim(),
+        quantity: this.round(material.quantity, 2),
+        factor: this.round(material.factor, 2),
+        emission: this.round(material.emission, 1),
+      })),
     };
   }
 
@@ -254,6 +279,62 @@ export class CalculationPersistenceService {
     return error instanceof HttpErrorResponse && error.status === 404;
   }
 
+  private resolveExistingSiteFromApi(
+    error: unknown,
+    payload: SiteInputPayload,
+    societyId: number,
+    cacheKey: string,
+  ): Observable<SiteResponse> {
+    if (!(error instanceof HttpErrorResponse) || !this.shouldLookupExistingSite(error)) {
+      return throwError(() => error);
+    }
+
+    return this.getSiteComparisons().pipe(
+      map((sites) => this.findExistingSiteFromComparison(sites, payload, societyId)),
+      switchMap((existingSite) => {
+        if (!existingSite) {
+          return throwError(() => error);
+        }
+
+        const resolvedSite: SiteResponse = {
+          id: existingSite.id,
+          name: existingSite.name,
+        };
+
+        this.writeCachedSiteId(cacheKey, resolvedSite.id);
+        return of(resolvedSite);
+      }),
+      catchError(() => throwError(() => error)),
+    );
+  }
+
+  private shouldLookupExistingSite(error: HttpErrorResponse): boolean {
+    return error.status === 400 || error.status === 409;
+  }
+
+  private findExistingSiteFromComparison(
+    sites: ApiSiteComparisonRecord[],
+    payload: SiteInputPayload,
+    societyId: number,
+  ): ApiSiteComparisonRecord | undefined {
+    const normalizedSiteName = this.normalizeText(payload.siteName);
+    const normalizedCity = this.normalizeText(payload.city);
+    const employees = this.toInteger(payload.employees);
+    const parkingPlaces = this.toInteger(payload.parkingSpaces);
+    const numberPc = this.toInteger(payload.computers);
+
+    return sites.find((site) => {
+      return (
+        site.societyId === societyId &&
+        this.normalizeText(site.name) === normalizedSiteName &&
+        this.normalizeText(site.city) === normalizedCity &&
+        site.numberEmployee === employees &&
+        site.parkingPlaces === parkingPlaces &&
+        site.numberPc === numberPc
+      );
+    });
+  }
+
   private getTodayIsoDate(): string {
     const now = new Date();
     const year = now.getFullYear();
@@ -269,6 +350,10 @@ export class CalculationPersistenceService {
 
   private round(value: number, digits: number): number {
     return Number(value.toFixed(digits));
+  }
+
+  private normalizeText(value: string): string {
+    return value.trim().toLowerCase();
   }
 
   private readCachedSiteId(cacheKey: string): number | null {

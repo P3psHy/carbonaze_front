@@ -33,7 +33,7 @@ describe('CalculationPersistenceService', () => {
     employees: 12.6,
     parkingSpaces: 4.4,
     computers: 8.2,
-    materials: [],
+    materials: [{ materialId: 'material-42', name: 'Acier', quantity: 2 }],
   };
 
   const result: SiteImpactResult = {
@@ -43,9 +43,9 @@ describe('CalculationPersistenceService', () => {
     emissionPerEmployee: 0.77,
     dominantCategory: 'Materiaux',
     dominantShare: 40,
-    materialCount: 0,
+    materialCount: 1,
     categories: [],
-    materials: [],
+    materials: [{ name: 'Acier', quantity: 2, factor: 1.9, emission: 3.8, share: 39.3, color: '#14532d' }],
     insights: [],
   };
 
@@ -95,6 +95,7 @@ describe('CalculationPersistenceService', () => {
       gasKwhYear: 456.2,
       totalCo2: 9.7,
       calculationDate: '2026-03-16',
+      materials: [{ name: 'Acier', quantity: 2, factor: 1.9, emission: 3.8 }],
     });
     bilanRequest.flush({
       id: 55,
@@ -189,6 +190,47 @@ describe('CalculationPersistenceService', () => {
 
     expect(savedRecord?.siteId).toBe(32);
     expect(Object.values(JSON.parse(localStorage.getItem('carbonaze.backend.sites') ?? '{}'))).toContain(32);
+  });
+
+  it('reuses an existing site from comparison when site creation returns conflict', () => {
+    let savedRecord: SavedCalculationRecord | undefined;
+
+    service.saveCalculation(payload, result).subscribe((value) => {
+      savedRecord = value;
+    });
+
+    const siteCreationRequest = httpTestingController.expectOne(`${environment.apiUrl}/sites`);
+    siteCreationRequest.flush({ message: 'Site deja existant.' }, { status: 409, statusText: 'Conflict' });
+
+    const comparisonRequest = httpTestingController.expectOne(`${environment.apiUrl}/sites/comparison`);
+    comparisonRequest.flush([
+      {
+        id: 21,
+        name: 'HQ Paris',
+        city: 'Paris',
+        numberEmployee: 13,
+        parkingPlaces: 4,
+        numberPc: 8,
+        createdAt: '2026-03-16T09:30:00',
+        societyId: 9,
+      },
+    ]);
+
+    const bilanRequest = httpTestingController.expectOne(`${environment.apiUrl}/sites/21/bilans`);
+    expect(bilanRequest.request.method).toBe('POST');
+    bilanRequest.flush({
+      id: 58,
+      totalCo2: 9.7,
+      calculationDate: '2026-03-16',
+    });
+
+    expect(savedRecord).toEqual({
+      bilanId: 58,
+      siteId: 21,
+      siteName: 'HQ Paris',
+      totalCo2: 9.7,
+      calculationDate: '2026-03-16',
+    });
   });
 
   it('propagates non-404 backend errors without wiping the cache', () => {

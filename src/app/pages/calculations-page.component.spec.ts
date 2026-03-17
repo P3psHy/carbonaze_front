@@ -99,6 +99,9 @@ describe('CalculationsPageComponent', () => {
     employees: 8,
     parkingSpaces: 3,
     computers: 5,
+    materials: [
+      { name: 'Acier', quantity: 2, factor: 1.9, emission: 3.8 },
+    ],
     totalCo2: 12.4,
     calculationDate: '2026-03-16',
   };
@@ -331,5 +334,7 @@ describe('CalculationsPageComponent', () => {
     expect(component.siteForm.controls.parkingSpaces.value).toBe(3);
     expect(component.siteForm.controls.computers.value).toBe(5);
     expect(component.materials.length).toBe(1);
+    expect(component.materials.at(0).controls.materialId.value).toBe('acier');
+    expect(component.materials.at(0).controls.quantity.value).toBe(2);
   });
 });

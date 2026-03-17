@@ -22,6 +22,7 @@ import {
 import { finalize } from 'rxjs';
 
 import {
+  ApiBilanMaterialRecord,
   CalculationPersistenceService,
   LoadedBilanDraft,
   SavedCalculationRecord,
@@ -336,7 +337,15 @@ export class CalculationsPageComponent {
     });
 
     this.materials.clear();
-    this.materials.push(this.createMaterial());
+    const loadedMaterialRows = this.resolveLoadedMaterialRows(loadedBilan.materials ?? []);
+
+    if (loadedMaterialRows.length > 0) {
+      loadedMaterialRows.forEach((material) => {
+        this.materials.push(this.createMaterial(material.materialId, material.quantity));
+      });
+    } else {
+      this.materials.push(this.createMaterial());
+    }
 
     this.siteForm.markAsPristine();
     this.siteForm.markAsUntouched();
@@ -373,6 +382,11 @@ export class CalculationsPageComponent {
       loadedBilan.parkingSpaces !== undefined &&
       loadedBilan.computers !== null &&
       loadedBilan.computers !== undefined;
+    const hasLoadedMaterials = (loadedBilan.materials ?? []).length > 0;
+
+    if (hasSiteOperationalInputs && hasLoadedMaterials) {
+      return `Bilan charge depuis l'API${dateLabel}. Les consommations, donnees site et materiaux disponibles ont ete pre-remplis.`;
+    }
 
     if (hasSiteOperationalInputs) {
       return `Bilan charge depuis l'API${dateLabel}. Les consommations et donnees site disponibles ont ete pre-remplies.`;
@@ -390,6 +404,53 @@ export class CalculationsPageComponent {
 
   private resolveConfiguredMaterialName(materialId: string): string {
     return this.resolveConfiguredMaterial(materialId)?.name ?? '';
+  }
+
+  private resolveLoadedMaterialRows(
+    materials: ApiBilanMaterialRecord[],
+  ): Array<{ materialId: string; quantity: number | null }> {
+    return materials.reduce<Array<{ materialId: string; quantity: number | null }>>((rows, material) => {
+      const quantity = typeof material.quantity === 'number' && Number.isFinite(material.quantity)
+        ? material.quantity
+        : null;
+      const configuredMaterialId = this.resolveConfiguredMaterialIdFromLoadedMaterial(material);
+
+      if (!configuredMaterialId || quantity === null || quantity <= 0) {
+        return rows;
+      }
+
+      rows.push({
+        materialId: configuredMaterialId,
+        quantity,
+      });
+      return rows;
+    }, []);
+  }
+
+  private resolveConfiguredMaterialIdFromLoadedMaterial(material: ApiBilanMaterialRecord): string {
+    const configuredMaterials = this.configuredMaterials();
+
+    if (typeof material.materialId === 'number' && Number.isFinite(material.materialId)) {
+      const matchByBackendId = configuredMaterials.find(
+        (configuredMaterial) => configuredMaterial.backendId === material.materialId,
+      );
+
+      if (matchByBackendId) {
+        return matchByBackendId.id;
+      }
+    }
+
+    const normalizedName = material.name?.trim().toLowerCase();
+
+    if (!normalizedName) {
+      return '';
+    }
+
+    const matchByName = configuredMaterials.find(
+      (configuredMaterial) => configuredMaterial.name.trim().toLowerCase() === normalizedName,
+    );
+
+    return matchByName?.id ?? '';
   }
 
   private syncMaterialSelections(): void {

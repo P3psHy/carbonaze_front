@@ -234,6 +234,7 @@ export class App {
         typeof sourceSite?.numberPc === 'number' && Number.isFinite(sourceSite.numberPc)
           ? sourceSite.numberPc
           : null,
+      materials: bilan.materials ?? historyEntry.materials ?? [],
       totalCo2: typeof bilan.totalCo2 === 'number' && Number.isFinite(bilan.totalCo2) ? bilan.totalCo2 : null,
       calculationDate: bilan.calculationDate ?? historyEntry.calculationDate ?? '',
     };

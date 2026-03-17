@@ -231,6 +231,7 @@ describe('App', () => {
       gasKwhYear: 2000,
       totalCo2: 12.4,
       calculationDate: '2026-03-17',
+      materials: [{ name: 'Acier', quantity: 2, factor: 1.9, emission: 3.8 }],
     });
 
     await fixture.whenStable();
