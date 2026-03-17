@@ -2,17 +2,9 @@ import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable, catchError, map, of, switchMap, tap, throwError } from 'rxjs';
 
+import { AuthService } from './auth.service';
 import { environment } from '../environment/environment';
 import { SiteImpactResult, SiteInputPayload } from './site-impact.models';
-
-interface CreateSocietyRequest {
-  name: string;
-}
-
-interface SocietyResponse {
-  id: number;
-  name: string;
-}
 
 interface CreateSiteRequest {
   name: string;
@@ -52,7 +44,27 @@ export interface ApiBilanRecord {
     id?: number;
     name?: string;
     city?: string;
+    numberEmployee?: number;
+    parkingPlaces?: number;
+    numberPc?: number;
+    societyId?: number;
   };
+}
+
+export interface ApiSiteComparisonRecord {
+  id: number;
+  name: string;
+  city: string;
+  numberEmployee: number;
+  parkingPlaces: number;
+  numberPc: number;
+  createdAt: string;
+  societyId: number;
+  latestBilanId?: number;
+  latestCalculationDate?: string;
+  latestTotalCo2?: number;
+  latestElectricityKwhYear?: number;
+  latestGasKwhYear?: number;
 }
 
 export interface SavedCalculationRecord {
@@ -70,13 +82,14 @@ export interface LoadedBilanDraft {
   city: string;
   energyMwh: number | null;
   gasMwh: number | null;
+  employees?: number | null;
+  parkingSpaces?: number | null;
+  computers?: number | null;
   totalCo2: number | null;
   calculationDate: string;
 }
 
 const API_BASE_URL = environment.apiUrl;
-const DEFAULT_SOCIETY_NAME = 'Carbonaze Front';
-const SOCIETY_STORAGE_KEY = 'carbonaze.backend.society';
 const SITE_STORAGE_KEY = 'carbonaze.backend.sites';
 const HISTORY_STORAGE_KEY = 'carbonaze.backend.calculation-history';
 const MAX_HISTORY_ENTRIES = 50;
@@ -84,6 +97,7 @@ const MAX_HISTORY_ENTRIES = 50;
 @Injectable({ providedIn: 'root' })
 export class CalculationPersistenceService {
   private readonly http = inject(HttpClient);
+  private readonly authService = inject(AuthService);
 
   saveCalculation(
     payload: SiteInputPayload,
@@ -112,6 +126,12 @@ export class CalculationPersistenceService {
 
   getBilanById(bilanId: number): Observable<ApiBilanRecord> {
     return this.http.get<ApiBilanRecord>(`${API_BASE_URL}/bilans/${bilanId}`);
+  }
+
+  getSiteComparisons(): Observable<ApiSiteComparisonRecord[]> {
+    return this.http.get<ApiSiteComparisonRecord[]>(`${API_BASE_URL}/sites/comparison`).pipe(
+      map((sites) => [...sites].sort((left, right) => this.sortSiteComparisons(left, right))),
+    );
   }
 
   deleteBilan(bilanId: number): Observable<void> {
@@ -144,7 +164,7 @@ export class CalculationPersistenceService {
     payload: SiteInputPayload,
     result: SiteImpactResult,
   ): Observable<SavedCalculationRecord> {
-    return this.getOrCreateSocietyId().pipe(
+    return this.getAuthenticatedSocietyId().pipe(
       switchMap((societyId) => this.getOrCreateSite(payload, societyId)),
       switchMap((site) =>
         this.http
@@ -165,25 +185,14 @@ export class CalculationPersistenceService {
     );
   }
 
-  private getOrCreateSocietyId(): Observable<number> {
-    const cachedSocietyId = this.readCachedSocietyId();
+  private getAuthenticatedSocietyId(): Observable<number> {
+    const societyId = this.authService.getSocietyId();
 
-    if (cachedSocietyId !== null) {
-      return of(cachedSocietyId);
+    if (societyId === null) {
+      return throwError(() => new Error("Vous devez etre connecte pour sauvegarder un calcul."));
     }
 
-    const request: CreateSocietyRequest = {
-      name: DEFAULT_SOCIETY_NAME,
-    };
-
-    return this.http
-      .post<SocietyResponse>(`${API_BASE_URL}/societies`, request)
-      .pipe(
-        map((response) => {
-          this.writeCachedSocietyId(response.id);
-          return response.id;
-        }),
-      );
+    return of(societyId);
   }
 
   private getOrCreateSite(payload: SiteInputPayload, societyId: number): Observable<SiteResponse> {
@@ -262,29 +271,6 @@ export class CalculationPersistenceService {
     return Number(value.toFixed(digits));
   }
 
-  private readCachedSocietyId(): number | null {
-    try {
-      const rawValue = globalThis.localStorage?.getItem(SOCIETY_STORAGE_KEY);
-
-      if (!rawValue) {
-        return null;
-      }
-
-      const parsedValue = Number(rawValue);
-      return Number.isFinite(parsedValue) ? parsedValue : null;
-    } catch {
-      return null;
-    }
-  }
-
-  private writeCachedSocietyId(societyId: number): void {
-    try {
-      globalThis.localStorage?.setItem(SOCIETY_STORAGE_KEY, societyId.toString());
-    } catch {
-      return;
-    }
-  }
-
   private readCachedSiteId(cacheKey: string): number | null {
     try {
       const rawValue = globalThis.localStorage?.getItem(SITE_STORAGE_KEY);
@@ -316,7 +302,6 @@ export class CalculationPersistenceService {
 
   private clearCachedReferences(): void {
     try {
-      globalThis.localStorage?.removeItem(SOCIETY_STORAGE_KEY);
       globalThis.localStorage?.removeItem(SITE_STORAGE_KEY);
     } catch {
       return;
@@ -367,6 +352,18 @@ export class CalculationPersistenceService {
 
     return left.id - right.id;
   }
+
+  private sortSiteComparisons(left: ApiSiteComparisonRecord, right: ApiSiteComparisonRecord): number {
+    const leftTotal = typeof left.latestTotalCo2 === 'number' ? left.latestTotalCo2 : -1;
+    const rightTotal = typeof right.latestTotalCo2 === 'number' ? right.latestTotalCo2 : -1;
+
+    if (leftTotal !== rightTotal) {
+      return rightTotal - leftTotal;
+    }
+
+    return left.name.localeCompare(right.name, 'fr');
+  }
+
   private isSavedCalculationRecord(value: unknown): value is SavedCalculationRecord {
     if (!value || typeof value !== 'object') {
       return false;

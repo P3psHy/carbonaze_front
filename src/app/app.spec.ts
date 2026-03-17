@@ -10,10 +10,19 @@ import { App } from './app';
 import { routes } from './app.routes';
 import { environment } from '../environment/environment';
 
+const AUTH_SESSION = {
+  token: 'test-jwt-token',
+  userId: 1,
+  mail: 'tester@carbonaze.fr',
+  societyId: 9,
+  societyName: 'Carbonaze Tests',
+};
+
 describe('App', () => {
   let httpTestingController: HttpTestingController;
 
   beforeEach(async () => {
+    localStorage.setItem('carbonaze.auth.session', JSON.stringify(AUTH_SESSION));
     window.scrollTo = (() => {}) as typeof window.scrollTo;
     HTMLElement.prototype.scrollIntoView =
       (() => {}) as typeof HTMLElement.prototype.scrollIntoView;
@@ -151,6 +160,14 @@ describe('App', () => {
       {
         id: 7,
         siteId: 3,
+        site: {
+          id: 3,
+          name: 'Site Paris',
+          city: 'Paris',
+          numberEmployee: 120,
+          parkingPlaces: 30,
+          numberPc: 90,
+        },
         totalCo2: 12.4,
         calculationDate: '2026-03-17',
       },
@@ -159,7 +176,7 @@ describe('App', () => {
     await fixture.whenStable();
     fixture.detectChanges();
 
-    expect(root.textContent).toContain('Bilan #7');
+    expect(root.textContent).toContain('Site Paris');
     expect(root.textContent).toContain('12.4 tCO2e');
   });
 
@@ -178,6 +195,14 @@ describe('App', () => {
       {
         id: 7,
         siteId: 3,
+        site: {
+          id: 3,
+          name: 'Site Paris',
+          city: 'Paris',
+          numberEmployee: 120,
+          parkingPlaces: 30,
+          numberPc: 90,
+        },
         totalCo2: 12.4,
         calculationDate: '2026-03-17',
       },
@@ -194,6 +219,14 @@ describe('App', () => {
     bilanRequest.flush({
       id: 7,
       siteId: 3,
+      site: {
+        id: 3,
+        name: 'Site Paris',
+        city: 'Paris',
+        numberEmployee: 120,
+        parkingPlaces: 30,
+        numberPc: 90,
+      },
       electricityKwhYear: 10000,
       gasKwhYear: 2000,
       totalCo2: 12.4,

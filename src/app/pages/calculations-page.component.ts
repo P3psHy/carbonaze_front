@@ -330,9 +330,9 @@ export class CalculationsPageComponent {
       city: loadedBilan.city,
       energyMwh: loadedBilan.energyMwh,
       gasMwh: loadedBilan.gasMwh,
-      employees: null,
-      parkingSpaces: null,
-      computers: null,
+      employees: loadedBilan.employees ?? null,
+      parkingSpaces: loadedBilan.parkingSpaces ?? null,
+      computers: loadedBilan.computers ?? null,
     });
 
     this.materials.clear();
@@ -366,6 +366,17 @@ export class CalculationsPageComponent {
     const dateLabel = loadedBilan.calculationDate
       ? ` du ${this.formatIsoDate(loadedBilan.calculationDate)}`
       : '';
+    const hasSiteOperationalInputs =
+      loadedBilan.employees !== null &&
+      loadedBilan.employees !== undefined &&
+      loadedBilan.parkingSpaces !== null &&
+      loadedBilan.parkingSpaces !== undefined &&
+      loadedBilan.computers !== null &&
+      loadedBilan.computers !== undefined;
+
+    if (hasSiteOperationalInputs) {
+      return `Bilan charge depuis l'API${dateLabel}. Les consommations et donnees site disponibles ont ete pre-remplies.`;
+    }
 
     return `Bilan charge depuis l'API${dateLabel}. Les consommations disponibles ont ete pre-remplies. Completez les champs manquants pour recalculer le detail.`;
   }

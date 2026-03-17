@@ -5,8 +5,21 @@ import { TestBed } from '@angular/core/testing';
 import { vi } from 'vitest';
 
 import { environment } from '../environment/environment';
-import { ApiBilanRecord, CalculationPersistenceService, SavedCalculationRecord } from './calculation-persistence.service';
+import {
+  ApiBilanRecord,
+  ApiSiteComparisonRecord,
+  CalculationPersistenceService,
+  SavedCalculationRecord,
+} from './calculation-persistence.service';
 import { SiteImpactResult, SiteInputPayload } from './site-impact.models';
+
+const AUTH_SESSION = {
+  token: 'test-jwt-token',
+  userId: 1,
+  mail: 'tester@carbonaze.fr',
+  societyId: 9,
+  societyName: 'Carbonaze Tests',
+};
 
 describe('CalculationPersistenceService', () => {
   let service: CalculationPersistenceService;
@@ -40,6 +53,7 @@ describe('CalculationPersistenceService', () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-03-16T09:30:00Z'));
     localStorage.clear();
+    localStorage.setItem('carbonaze.auth.session', JSON.stringify(AUTH_SESSION));
 
     TestBed.configureTestingModule({
       providers: [CalculationPersistenceService, provideHttpClient(), provideHttpClientTesting()],
@@ -55,17 +69,12 @@ describe('CalculationPersistenceService', () => {
     vi.useRealTimers();
   });
 
-  it('creates society, site and bilan, then caches their identifiers', () => {
+  it('creates site and bilan, then caches their identifiers', () => {
     let savedRecord: SavedCalculationRecord | undefined;
 
     service.saveCalculation(payload, result).subscribe((value) => {
       savedRecord = value;
     });
-
-    const societyRequest = httpTestingController.expectOne(`${environment.apiUrl}/societies`);
-    expect(societyRequest.request.method).toBe('POST');
-    expect(societyRequest.request.body).toEqual({ name: 'Carbonaze Front' });
-    societyRequest.flush({ id: 9, name: 'Carbonaze Front' });
 
     const siteRequest = httpTestingController.expectOne(`${environment.apiUrl}/sites`);
     expect(siteRequest.request.method).toBe('POST');
@@ -100,12 +109,10 @@ describe('CalculationPersistenceService', () => {
       totalCo2: 9.7,
       calculationDate: '2026-03-16',
     });
-    expect(localStorage.getItem('carbonaze.backend.society')).toBe('9');
     expect(Object.values(JSON.parse(localStorage.getItem('carbonaze.backend.sites') ?? '{}'))).toContain(21);
   });
 
-  it('reuses cached society and site ids when available', () => {
-    localStorage.setItem('carbonaze.backend.society', '9');
+  it('reuses cached site ids when available', () => {
     localStorage.setItem(
       'carbonaze.backend.sites',
       JSON.stringify({
@@ -144,7 +151,6 @@ describe('CalculationPersistenceService', () => {
   });
 
   it('clears cached references and retries when the backend returns 404', () => {
-    localStorage.setItem('carbonaze.backend.society', '9');
     localStorage.setItem(
       'carbonaze.backend.sites',
       JSON.stringify({
@@ -171,9 +177,6 @@ describe('CalculationPersistenceService', () => {
       statusText: 'Not Found',
     });
 
-    const societyRequest = httpTestingController.expectOne(`${environment.apiUrl}/societies`);
-    societyRequest.flush({ id: 18, name: 'Carbonaze Front' });
-
     const siteRequest = httpTestingController.expectOne(`${environment.apiUrl}/sites`);
     siteRequest.flush({ id: 32, name: 'HQ Paris' });
 
@@ -185,12 +188,10 @@ describe('CalculationPersistenceService', () => {
     });
 
     expect(savedRecord?.siteId).toBe(32);
-    expect(localStorage.getItem('carbonaze.backend.society')).toBe('18');
     expect(Object.values(JSON.parse(localStorage.getItem('carbonaze.backend.sites') ?? '{}'))).toContain(32);
   });
 
   it('propagates non-404 backend errors without wiping the cache', () => {
-    localStorage.setItem('carbonaze.backend.society', '9');
     localStorage.setItem(
       'carbonaze.backend.sites',
       JSON.stringify({
@@ -220,7 +221,7 @@ describe('CalculationPersistenceService', () => {
     });
 
     expect(thrownError).toBeInstanceOf(HttpErrorResponse);
-    expect(localStorage.getItem('carbonaze.backend.society')).toBe('9');
+    expect(localStorage.getItem('carbonaze.backend.sites')).toContain('21');
   });
 
   it('retrieves all bilans from the API and caches the normalized history', () => {
@@ -332,5 +333,73 @@ describe('CalculationPersistenceService', () => {
       totalCo2: 9.7,
       calculationDate: '2026-03-16',
     });
+  });
+
+  it('retrieves comparison entries from the API', () => {
+    let comparisonEntries: ApiSiteComparisonRecord[] | undefined;
+
+    service.getSiteComparisons().subscribe((value) => {
+      comparisonEntries = value;
+    });
+
+    const request = httpTestingController.expectOne(`${environment.apiUrl}/sites/comparison`);
+    expect(request.request.method).toBe('GET');
+    request.flush([
+      {
+        id: 9,
+        name: 'Site Lyon',
+        city: 'Lyon',
+        numberEmployee: 80,
+        parkingPlaces: 24,
+        numberPc: 54,
+        createdAt: '2026-03-16T10:30:00',
+        societyId: 5,
+        latestBilanId: 101,
+        latestCalculationDate: '2026-03-18',
+        latestTotalCo2: 12.3,
+      },
+      {
+        id: 8,
+        name: 'Site Paris',
+        city: 'Paris',
+        numberEmployee: 100,
+        parkingPlaces: 30,
+        numberPc: 70,
+        createdAt: '2026-03-17T11:15:00',
+        societyId: 5,
+        latestBilanId: 99,
+        latestCalculationDate: '2026-03-17',
+        latestTotalCo2: 17.9,
+      },
+    ]);
+
+    expect(comparisonEntries).toEqual([
+      {
+        id: 8,
+        name: 'Site Paris',
+        city: 'Paris',
+        numberEmployee: 100,
+        parkingPlaces: 30,
+        numberPc: 70,
+        createdAt: '2026-03-17T11:15:00',
+        societyId: 5,
+        latestBilanId: 99,
+        latestCalculationDate: '2026-03-17',
+        latestTotalCo2: 17.9,
+      },
+      {
+        id: 9,
+        name: 'Site Lyon',
+        city: 'Lyon',
+        numberEmployee: 80,
+        parkingPlaces: 24,
+        numberPc: 54,
+        createdAt: '2026-03-16T10:30:00',
+        societyId: 5,
+        latestBilanId: 101,
+        latestCalculationDate: '2026-03-18',
+        latestTotalCo2: 12.3,
+      },
+    ]);
   });
 });

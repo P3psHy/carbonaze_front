@@ -96,6 +96,9 @@ describe('CalculationsPageComponent', () => {
     city: 'Paris',
     energyMwh: 10,
     gasMwh: 2,
+    employees: 8,
+    parkingSpaces: 3,
+    computers: 5,
     totalCo2: 12.4,
     calculationDate: '2026-03-16',
   };
@@ -324,7 +327,9 @@ describe('CalculationsPageComponent', () => {
     expect(component.isInputModalOpen()).toBe(true);
     expect(component.siteForm.controls.siteName.value).toBe('HQ Paris');
     expect(component.siteForm.controls.energyMwh.value).toBe(10);
-    expect(component.siteForm.controls.employees.value).toBeNull();
+    expect(component.siteForm.controls.employees.value).toBe(8);
+    expect(component.siteForm.controls.parkingSpaces.value).toBe(3);
+    expect(component.siteForm.controls.computers.value).toBe(5);
     expect(component.materials.length).toBe(1);
   });
 });

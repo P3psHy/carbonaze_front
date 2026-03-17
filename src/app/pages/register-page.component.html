@@ -1,0 +1,71 @@
+<div class="page-shell min-h-screen overflow-hidden">
+  <div class="orb orb-left" aria-hidden="true"></div>
+  <div class="orb orb-right" aria-hidden="true"></div>
+
+  <main class="page-frame">
+    <section class="mx-auto max-w-[560px] panel rounded-[34px] p-6 sm:p-8">
+      <p class="eyebrow">Authentification</p>
+      <h1 class="font-heading mt-3 text-4xl font-semibold tracking-[-0.05em] text-[var(--ink)]">Inscription</h1>
+      <p class="mt-4 text-base leading-8 text-[var(--muted)]">
+        Creez votre compte et votre societe pour obtenir un JWT.
+      </p>
+
+      <form class="mt-8 grid gap-5" [formGroup]="registerForm" (ngSubmit)="submit()">
+        <div class="field-shell">
+          <label class="field-label" for="register-society">Societe</label>
+          <input
+            id="register-society"
+            type="text"
+            class="field-input"
+            formControlName="societyName"
+            autocomplete="organization"
+            placeholder="Nom de la societe"
+          />
+        </div>
+
+        <div class="field-shell">
+          <label class="field-label" for="register-mail">Email</label>
+          <input
+            id="register-mail"
+            type="email"
+            class="field-input"
+            formControlName="mail"
+            autocomplete="email"
+            placeholder="vous@entreprise.com"
+          />
+        </div>
+
+        <div class="field-shell">
+          <label class="field-label" for="register-password">Mot de passe</label>
+          <input
+            id="register-password"
+            type="password"
+            class="field-input"
+            formControlName="password"
+            autocomplete="new-password"
+            placeholder="8 caracteres minimum"
+          />
+        </div>
+
+        @if (feedback()) {
+          <p class="text-sm font-semibold leading-7 text-[#9a3412]">
+            {{ feedback() }}
+          </p>
+        }
+
+        <button
+          type="submit"
+          class="inline-flex items-center justify-center rounded-full bg-[var(--moss)] px-5 py-3 text-sm font-semibold text-white shadow-[0_18px_40px_rgba(19,92,82,0.18)] transition hover:-translate-y-0.5 hover:bg-[#104a42] disabled:cursor-not-allowed disabled:opacity-70"
+          [disabled]="isSubmitting()"
+        >
+          {{ isSubmitting() ? 'Creation...' : 'Creer un compte' }}
+        </button>
+      </form>
+
+      <p class="mt-6 text-sm leading-7 text-[var(--muted)]">
+        Deja inscrit ?
+        <a class="font-semibold text-[var(--moss)] hover:underline" [routerLink]="['/login']">Se connecter</a>
+      </p>
+    </section>
+  </main>
+</div>

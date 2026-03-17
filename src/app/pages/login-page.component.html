@@ -1,0 +1,59 @@
+<div class="page-shell min-h-screen overflow-hidden">
+  <div class="orb orb-left" aria-hidden="true"></div>
+  <div class="orb orb-right" aria-hidden="true"></div>
+
+  <main class="page-frame">
+    <section class="mx-auto max-w-[560px] panel rounded-[34px] p-6 sm:p-8">
+      <p class="eyebrow">Authentification</p>
+      <h1 class="font-heading mt-3 text-4xl font-semibold tracking-[-0.05em] text-[var(--ink)]">Connexion</h1>
+      <p class="mt-4 text-base leading-8 text-[var(--muted)]">
+        Connectez-vous pour utiliser les APIs Carbonaze avec un jeton JWT.
+      </p>
+
+      <form class="mt-8 grid gap-5" [formGroup]="loginForm" (ngSubmit)="submit()">
+        <div class="field-shell">
+          <label class="field-label" for="login-mail">Email</label>
+          <input
+            id="login-mail"
+            type="email"
+            class="field-input"
+            formControlName="mail"
+            autocomplete="email"
+            placeholder="vous@entreprise.com"
+          />
+        </div>
+
+        <div class="field-shell">
+          <label class="field-label" for="login-password">Mot de passe</label>
+          <input
+            id="login-password"
+            type="password"
+            class="field-input"
+            formControlName="password"
+            autocomplete="current-password"
+            placeholder="Votre mot de passe"
+          />
+        </div>
+
+        @if (feedback()) {
+          <p class="text-sm font-semibold leading-7 text-[#9a3412]">
+            {{ feedback() }}
+          </p>
+        }
+
+        <button
+          type="submit"
+          class="inline-flex items-center justify-center rounded-full bg-[var(--moss)] px-5 py-3 text-sm font-semibold text-white shadow-[0_18px_40px_rgba(19,92,82,0.18)] transition hover:-translate-y-0.5 hover:bg-[#104a42] disabled:cursor-not-allowed disabled:opacity-70"
+          [disabled]="isSubmitting()"
+        >
+          {{ isSubmitting() ? 'Connexion...' : 'Se connecter' }}
+        </button>
+      </form>
+
+      <p class="mt-6 text-sm leading-7 text-[var(--muted)]">
+        Pas encore de compte ?
+        <a class="font-semibold text-[var(--moss)] hover:underline" [routerLink]="['/inscription']">Creer un compte</a>
+      </p>
+    </section>
+  </main>
+</div>

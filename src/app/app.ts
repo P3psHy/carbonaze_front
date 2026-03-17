@@ -3,6 +3,7 @@ import { Component, DestroyRef, HostListener, inject, signal } from '@angular/co
 import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { finalize } from 'rxjs';
 
+import { AuthService } from './auth.service';
 import { BodyScrollLockService } from './body-scroll-lock.service';
 import {
   ApiBilanRecord,
@@ -24,12 +25,15 @@ export class App {
   private readonly viewportScroller = inject(ViewportScroller);
   private readonly calculationPersistenceService = inject(CalculationPersistenceService);
   private readonly bodyScrollLockService = inject(BodyScrollLockService);
+  private readonly authService = inject(AuthService);
 
   protected readonly isHistoryModalOpen = signal(false);
   protected readonly isHistoryLoading = signal(false);
   protected readonly savedCalculations = signal<ApiBilanRecord[]>([]);
   protected readonly deletingBilanIds = signal<number[]>([]);
   protected readonly historyFeedback = signal<{ kind: 'success' | 'error'; message: string } | null>(null);
+  protected readonly authSession = this.authService.session;
+  protected readonly isAuthenticated = this.authService.isAuthenticated;
 
   constructor() {
     this.destroyRef.onDestroy(() => {
@@ -45,6 +49,19 @@ export class App {
     });
   }
 
+  protected goToLogin(): void {
+    void this.router.navigateByUrl('/login');
+  }
+
+  protected goToRegister(): void {
+    void this.router.navigateByUrl('/inscription');
+  }
+
+  protected logout(): void {
+    this.closeHistoryModal();
+    this.authService.logout();
+  }
+
   @HostListener('document:keydown.escape')
   protected handleEscape(): void {
     if (this.isHistoryModalOpen()) {
@@ -53,6 +70,11 @@ export class App {
   }
 
   protected openHistoryModal(): void {
+    if (!this.isAuthenticated()) {
+      this.goToLogin();
+      return;
+    }
+
     if (!this.isHistoryModalOpen()) {
       this.bodyScrollLockService.lock();
     }
@@ -185,11 +207,13 @@ export class App {
   }
 
   private buildLoadedBilanDraft(bilan: ApiBilanRecord, historyEntry: ApiBilanRecord): LoadedBilanDraft {
+    const sourceSite = bilan.site ?? historyEntry.site;
+
     return {
       bilanId: bilan.id,
       siteId: bilan.siteId ?? historyEntry.siteId,
-      siteName: historyEntry.site?.name?.trim() ?? bilan.site?.name?.trim() ?? '',
-      city: historyEntry.site?.city?.trim() ?? bilan.site?.city?.trim() ?? '',
+      siteName: sourceSite?.name?.trim() ?? '',
+      city: sourceSite?.city?.trim() ?? '',
       energyMwh:
         typeof bilan.electricityKwhYear === 'number' && Number.isFinite(bilan.electricityKwhYear)
           ? bilan.electricityKwhYear / 1000
@@ -197,6 +221,18 @@ export class App {
       gasMwh:
         typeof bilan.gasKwhYear === 'number' && Number.isFinite(bilan.gasKwhYear)
           ? bilan.gasKwhYear / 1000
+          : null,
+      employees:
+        typeof sourceSite?.numberEmployee === 'number' && Number.isFinite(sourceSite.numberEmployee)
+          ? sourceSite.numberEmployee
+          : null,
+      parkingSpaces:
+        typeof sourceSite?.parkingPlaces === 'number' && Number.isFinite(sourceSite.parkingPlaces)
+          ? sourceSite.parkingPlaces
+          : null,
+      computers:
+        typeof sourceSite?.numberPc === 'number' && Number.isFinite(sourceSite.numberPc)
+          ? sourceSite.numberPc
           : null,
       totalCo2: typeof bilan.totalCo2 === 'number' && Number.isFinite(bilan.totalCo2) ? bilan.totalCo2 : null,
       calculationDate: bilan.calculationDate ?? historyEntry.calculationDate ?? '',

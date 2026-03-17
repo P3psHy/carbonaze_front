@@ -31,10 +31,22 @@
               Accueil
             </a>
             <a class="nav-pill" [routerLink]="['/calculs']" routerLinkActive="nav-pill-active">Calculs</a>
-            <button class="nav-pill nav-pill-button" type="button" data-testid="history-button" (click)="openHistoryModal()">
-              Historique
-            </button>
+            <a class="nav-pill" [routerLink]="['/comparaison']" routerLinkActive="nav-pill-active">Comparaison</a>
+            @if (isAuthenticated()) {
+              <button class="nav-pill nav-pill-button" type="button" data-testid="history-button" (click)="openHistoryModal()">
+                Historique
+              </button>
+              <button class="nav-pill nav-pill-button" type="button" (click)="logout()">Se deconnecter</button>
+            } @else {
+              <button class="nav-pill nav-pill-button" type="button" (click)="goToLogin()">Connexion</button>
+              <button class="nav-pill nav-pill-button" type="button" (click)="goToRegister()">Inscription</button>
+            }
           </nav>
+          @if (isAuthenticated() && authSession(); as session) {
+            <p class="text-xs text-[var(--muted)]">
+              {{ session.mail }} - {{ session.societyName }}
+            </p>
+          }
         </div>
       </div>
     </div>
